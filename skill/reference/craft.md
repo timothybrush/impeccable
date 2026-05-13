@@ -51,64 +51,15 @@ Then add references based on the brief's needs:
 - Responsive requirements? Consult [responsive-design.md](responsive-design.md)
 - Heavy on copy, labels, or errors? Consult [ux-writing.md](ux-writing.md)
 
-## Step 3: Land the Visual Direction (Capability-Gated)
+## Step 3: Visual Direction & Assets (Harness-Gated)
 
-Generate high-fidelity visual comps before implementation when all three are true:
+If the harness has **native image generation** (currently Codex via `image_gen`), this step is mandatory. **Stop and load [codex.md](codex.md)**. It covers palette generation, mock exploration, the approval loop, mock-fidelity inventory, and asset slicing via the `impeccable_asset_producer` subagent. Follow Steps A-F in that file, then return here for Step 4.
 
-- The work is net-new or visually open-ended enough that composition exploration will improve the build.
-- The brief's scope is mid-fi, high-fi, or production-ready.
-- The harness gives you native image generation (Codex's `image_gen`, an equivalent MCP tool). Don't ask the user to set up external APIs.
+If the harness lacks native image generation, **state in one line that the visual-direction-by-generation step is being skipped because the harness lacks native image generation, then proceed**. The one-line announcement is required; it forces a conscious decision instead of letting the step quietly evaporate. The brief is your only visual reference. Implement directly from it, treating any named anchor references and the brief's "Design Direction" as the contract.
 
-When met, this step is mandatory for both brand and product work. If image generation isn't available, skip silently. "The eventual UI is semantic/code-native/accessible" is not a reason to skip; those are implementation requirements, not exploration ones.
+Whether you generated mocks or not: don't replace required imagery with generic cards, bullets, emoji, fake metrics, decorative CSS panels, or filler copy. Image-led briefs (restaurants, hotels, magazines, photography, hobbyist communities, food, travel, fashion, product) need real or sourced imagery in the build, not CSS scenery.
 
-### What to generate
-
-Generate **1 to 3** high-fidelity north-star comps from the confirmed brief. If shape already produced direction probes, resolve the winning lane further, not an unrelated exploration. Comps must differ in primary visual direction, not just color.
-
-- Brand work: push visual identity, composition, and mood aggressively.
-- Product work: push hierarchy, topology, density, tone, grounded in realistic product structure.
-- Landing pages and long-form brand surfaces: show enough of the second fold to establish the system beyond the hero.
-
-### Approval loop
-
-Show the comps and ask what carries forward. Iterate until one direction is approved or the user delegates. If the user delegates, pick the strongest direction and explain it from the brief, not personal taste.
-
-Before Step 4, summarize what to carry into code and what **not** to literalize from the mock. This is the handoff between visual exploration and semantic implementation.
-
-### Mock fidelity inventory
-
-Inventory the approved mock's major visible ingredients:
-
-- Hero silhouette and dominant composition
-- Signature motifs (planets, devices, portraits, charts, route lines, insets, badges, etc.)
-- Nav and primary CTA treatment
-- Section sequence, especially the second fold
-- Image-native content the concept depends on
-- Typography, density, color/material treatment, motion cues
-
-For each, decide implementation: semantic HTML/CSS/SVG, generated asset, sourced asset, icon library, canvas/WebGL, or accepted omission. Don't substitute a different hero composition or visual driver post-approval without user sign-off.
-
-If a photographic, architectural, product, or place-led mock becomes generic CSS scenery / decorative diagrams / bullets / copy, stop and fix it. That's a broken implementation, not a harmless interpretation.
-
-Treat the mock as a north star, not a screenshot to trace. Don't rasterize core UI text. But if the live result lacks the mock's major ingredients, the implementation is wrong.
-
-## Step 4: Asset Extraction (Need-Gated)
-
-If the approved direction needs raster assets, create them before building. Do not replace required imagery with generic cards, bullets, emoji, fake metrics, decorative CSS panels, or filler copy.
-
-Use the native asset producer (`impeccable_asset_producer` in Codex, `impeccable-asset-producer` in Claude Code) to create clean assets from the hi-fi mock and crops. If you do not have explicit permission to use agents, stop and ask:
-
-```text
-Asset production will work better as a scoped subagent job. Should I spawn the Impeccable asset producer subagent for this step?
-```
-
-Do not skip asset production or silently do it inline. Inline asset production is allowed only if the user declines subagents, the harness cannot spawn the authorized agent, or the user explicitly asks for single-thread mode.
-
-Pass the approved mock, crop/contact-sheet paths, output directory, dimensions/formats, transparency needs, constraints, and avoid list to the asset producer. Attach image generation capability to the spawned agent when the harness supports it; do not load image-generation reference material into the parent thread first.
-
-Prefer HTML/CSS/SVG/canvas when they can credibly reproduce an ingredient; use real/generated/stock imagery when the mock or subject matter calls for actual visual content.
-
-## Step 5: Build to Production Quality
+## Step 4: Build to Production Quality
 
 Implement the feature following the design brief. Build in passes so structure, visual system, states, motion/media, and responsive behavior each get deliberate attention. The list below is the definition of done, not inspiration.
 
@@ -130,7 +81,7 @@ Implement the feature following the design brief. Build in passes so structure, 
 - **Technically clean.** Production build passes, no console errors, no avoidable layout shift, no needless dependencies, no broken asset paths.
 - **Ask when uncertain.** If a discovery materially changes the brief or approved direction, stop and ask. Don't guess.
 
-## Step 6: Iterate Visually
+## Step 5: Iterate Visually
 
 Look at what you built like a designer would. Your eyes are whatever the harness gives you: a connected browser, a screenshotting tool, Playwright, or asking the user. Use them for responsive testing (mobile, tablet, desktop minimum) and general visual validation.
 
@@ -144,7 +95,7 @@ Actively check: responsive behavior (composes, not shrinks), every state (empty 
 
 Detector or QA output is defect evidence only; never proof the work is finished.
 
-## Step 7: Present
+## Step 6: Present
 
 Present the result to the user:
 - Show the feature in its primary state
