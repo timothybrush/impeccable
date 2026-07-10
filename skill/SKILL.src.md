@@ -52,6 +52,10 @@ Then audit the plan before building: work through what you would produce for a *
 
 **Spend your boldness in one place.** Let the signature element be the one memorable thing; keep everything around it quiet and disciplined, and cut decoration that doesn't serve the brief. The discipline around the signature is what makes it land. Restraint executed everywhere, though, is its own failure: safe = invisible. <!-- rule:skill-boldness-one-place -->
 
+A signature carries weight: sized and placed so the page organizes itself around it. If it could be removed without changing the page's structure, it was decoration, not a signature. <!-- rule:skill-signature-structural -->
+
+**Prove, don't claim.** A page earns belief by showing the product doing its job: the interface at work, the mechanism dramatized, numbers and specifics a competitor couldn't copy-paste. When the brief describes how the product works, put that working on the page; a reader should understand what it does by looking, before reading a word. Sections that restate the hero's claim in different words add length, not substance. <!-- rule:skill-prove-dont-claim -->
+
 ### Commit
 
 - Pick a **color strategy** before picking colors, on the commitment axis: <!-- rule:skill-color-strategy-commitment -->
