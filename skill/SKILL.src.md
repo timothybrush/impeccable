@@ -51,14 +51,11 @@ Build to this floor without announcing it. The design detector (the project hook
 - Copy is design material: write from the user's side of the screen, active voice, a control says exactly what happens, errors explain what went wrong and how to fix it. Specific beats clever. <!-- rule:skill-copy-design-material -->
 
 <codex>
-**Codex-specific defects** (your most-frequent giveaways; refuse-and-rewrite):
+Calibration for this provider:
 
-- Display letter-spacing ≥ -0.04em is a hard floor. Your default of -0.05 to -0.085em on display H1s makes the letters touch. <!-- rule:skill-typo-codex-tracking-repeat -->
-- **`border: 1px solid X` + wide soft `box-shadow`** on the same element (the ghost-card). Pick one. <!-- rule:skill-ban-codex-ghost-card -->
-- **`border-radius: 32px+` on cards / sections / inputs.** Cards top out at 12-16px; full-pill is for tags and buttons. <!-- rule:skill-ban-codex-over-round -->
-- **Hand-drawn / sketchy SVG scenes** of tangible subjects read as amateurish. Real assets or no illustration. <!-- rule:skill-ban-codex-sketchy-svg -->
-- **Decorative stripe or grid backgrounds** from repeating gradients, unless the surface is an actual canvas, map, blueprint, or measurement tool. <!-- rule:skill-ban-codex-grid-backgrounds -->
-- **Meta-criticism copy**: naming a concept then layering an ironic modifier, or staging a strawman to "correct" it. Make the specific claim. <!-- rule:skill-ban-codex-x-theater -->
+- Display letter-spacing floor is -0.04em; -0.02 to -0.03em is plenty for tight grotesque display. Your default runs tighter and the letters touch. <!-- rule:skill-typo-codex-tracking-repeat -->
+- An element declares its elevation once: a border or a shadow, chosen deliberately, never both as decoration. Corner radius is a brand decision made once; containers keep it modest, and full rounding belongs to small controls. <!-- rule:skill-codex-elevation-radius -->
+- Illustration meets the same bar as typography: real assets or none. Backgrounds are surfaces, not decoration; texture appears only when the subject's world supplies it. Copy makes the specific claim instead of staging a concept to react to. <!-- rule:skill-codex-material-honesty -->
 </codex>
 
 <gemini>
