@@ -2,6 +2,10 @@
 
 You are reading this because nothing committed exists yet (greenfield), or the user asked for a redesign that discards the current look. Either way the task is the same: invent a visual identity that could not be mistaken for anyone else's, and build it to the craft floor. SKILL.md's rules all still apply; this file is the process that produces the identity.
 
+## The mode still governs
+
+Identity gets invented in every mode, but this playbook's energy lands differently per mode (SKILL.md's Registers section decides which applies). On Persuade and Experience surfaces, commitment is allowed to be loud. On Operate and Read surfaces, boldness means a committed **system**: a decisive typographic voice, an exact spacing rhythm, one owned accent, structure so clear it feels inevitable. The thesis of a Read surface is the content itself, served impeccably; the thesis of an Operate surface is the task, made effortless. Nothing you invent may stand between the visitor and what they came to do: a device that would impress a passerby but slow a reader fails its mode, however handsome.
+
 ## Seed
 
 If the project is brand-new (no committed tokens, fonts, or brand colors found in the code), run `node .qoder/skills/impeccable/scripts/palette.mjs` for a brand seed color. The seed exists to break your reflex palette; it does not override the subject. When the subject's world clearly dictates color (an era, a place, a material, a medium), derive the palette from that world and use the seed only to check yourself. Otherwise anchor on it. Use OKLCH throughout. Skip this entirely when the code already has committed brand colors: identity-preservation wins.
