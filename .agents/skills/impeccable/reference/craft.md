@@ -1,10 +1,10 @@
 # Craft Flow
 
-Build a feature with impeccable UX and UI quality: shape the design, land the visual direction, build real production code, inspect and improve in-browser until it meets a high-end studio bar.
+Build a feature with impeccable UX and UI quality: land the direction, build real production code, inspect and improve in-browser until it meets a high-end studio bar. This file is the *orchestration* of a build (when to pause, what to confirm, how to finish); the design thinking itself lives in SKILL.md and, for new identity work, [new-work.md](new-work.md). Rules stated there are not repeated here.
 
-Before writing code, you need: PRODUCT.md loaded, register identified and the matching reference loaded, and a confirmed design direction for this task (either from `shape` or supplied by the user). PRODUCT.md is project context, not a task-specific brief.
+Before writing code, you need: PRODUCT.md loaded, a confirmed design direction for this task (from `shape` or supplied by the user), and, when SKILL.md's new-work gate applies, [new-work.md](new-work.md) read.
 
-Treat any approved visual direction (generated mock or stated reference) as a concrete contract for composition, hierarchy, density, atmosphere, signature motifs, and distinctive visual moves. Don't let mocks replace structure, copy, accessibility, or state design. But if the live result lacks the approved direction's major ingredients, the implementation is wrong.
+Treat any approved visual direction (generated mock or stated reference) as a concrete contract for composition, hierarchy, density, atmosphere, and signature motifs. Don't let mocks replace structure, copy, accessibility, or state design. But if the live result lacks the approved direction's major ingredients, the implementation is wrong.
 
 ### Gates: do not compress
 
@@ -19,107 +19,52 @@ You must stop at every gate. **Shape confirmation alone is NOT a green light to 
 
 When the harness lacks native image generation, gates 2-4 collapse into the brief itself, and shape confirmation does advance straight to code.
 
-**Unattended runs.** When no user can respond (a one-shot task, an automated run, or an explicit instruction not to ask questions), every gate collapses into a decision you make yourself. Hold the same bar the gate would have held: state the shape brief, the visual direction, and the palette as decided (one line each, in your reasoning or the final summary), then proceed straight through to build and the visual iteration pass. Do not stop to wait, do not ask, and do not skip the direction thinking just because nobody will read the questions.
+**Unattended runs.** When no user can respond (a one-shot task, an automated run, or an explicit instruction not to ask questions), every gate collapses into a decision you make yourself. Hold the same bar the gate would have held: state the shape brief, the visual direction, and the palette as decided (one line each), then proceed straight through to build and the visual iteration pass. Do not stop to wait, and do not skip the direction thinking just because nobody will read the questions.
 
 ## Step 0: Project Foundation
 
-Before shape, before code: figure out what kind of project you're working in.
+Before shape, before code: figure out what kind of project you're working in. Run `ls`. Check for:
 
-Look at the working directory. Run `ls`. Check for:
+- An existing framework (`astro.config.*`, `next.config.*`, `svelte.config.*`, `vite.config.*`, a `package.json` with framework deps). **If found, use it.** No parallel builds, no second framework, no writing to `dist/` or `build/` directly. Whatever pipeline the project has, respect it.
+- An existing component library, design system, or icon set. Read what's there before adding to it; use the project's set, don't introduce a second one.
 
-- An existing framework: `astro.config.mjs/ts`, `next.config.js/ts`, `nuxt.config.ts`, `svelte.config.js`, `vite.config.js/ts`, `package.json` with framework deps, `Cargo.toml` + Leptos/Yew, `Gemfile` + Rails. **If found, use it.** Do not start a parallel build, do not introduce a second framework, do not write to `dist/` or `build/` directly. Whatever pipeline the project has, respect it.
-- An existing component library or design system: `src/components/`, `app/components/`, a `tokens.css` / `theme.ts`, an `astro.config` `integrations`. Read what's there before adding to it.
-- An existing icon set: `lucide-react`, `@phosphor-icons/react`, `@iconify/*`, hand-rolled SVG sprites in `assets/icons/`. **Use what's already in the project**; don't introduce a second set.
-
-If the directory is empty (greenfield), don't pick a framework silently. Ask the user via the AskUserQuestion tool, with sensible defaults framed by the brief:
-
-```text
-What should this be built on?
-  - Astro (default for content-led brand sites, landing pages, marketing surfaces)
-  - SvelteKit / Next.js / Nuxt (when the brief implies an app surface or significant interactivity)
-  - Single index.html (one-shot demo, prototype, or a deliberately framework-free experiment)
-```
-
-Default: Astro for brand briefs, the project's existing framework for product briefs. Ask once; don't re-ask mid-task.
+If the directory is empty (greenfield), don't pick a framework silently. Ask the user (AskUserQuestion when available), with sensible defaults framed by the brief: Astro for content-led brand sites, SvelteKit/Next/Nuxt for app surfaces, single index.html for one-shot demos. Ask once; on unattended runs, decide and record.
 
 ## Step 1: Shape the Design
 
-Run $impeccable shape, passing along whatever feature description the user provided. Shape is **required** for craft; it is what produces a confirmed direction.
+Run $impeccable shape, passing along the feature description. Shape is **required** for craft; it produces the confirmed direction. Present the shape output and stop for confirmation (unattended: produce the compact shape output for yourself and continue). If the user already supplied a confirmed brief or ran shape separately, use it and skip this step.
 
-Present the shape output and stop. Wait for the user to confirm, override, or course-correct before writing code. On an unattended run, produce the compact shape output for yourself and continue without pausing.
+When the prompt + PRODUCT.md already answer scope, content, and visual direction with no real ambiguity, the shape output can be compact (3-5 bullets ending with "confirm or override"). Don't pad a clear brief; equally, don't skip the pause to look efficient.
 
-If the user already supplied a confirmed brief or ran shape separately, use it and skip this step.
+## Step 2: References
 
-When the original prompt + PRODUCT.md already answer scope, content, and visual direction with no real ambiguity, the shape output can be **compact** (3-5 bullets stating what you're building and the visual lane, ending with one or two specific questions or "confirm or override"). The full 10-section structured brief is reserved for genuinely ambiguous, multi-screen, or stakeholder-heavy tasks. Don't pad a clear brief into a long one to look thorough; equally, don't skip the pause to look efficient.
-
-If the harness has native image generation (Codex), a compact shape's "confirm or override" advances to **Step 3 and the codex.md flow**, not to Step 4. Phrase the closing line accordingly: "Confirm or override; once we lock direction, I'll run a couple of palette and reference questions before generating any mocks." This stops the model from reading shape confirmation as code-green.
-
-## Step 2: Load References
-
-Based on the design brief's "Recommended References" section, consult the relevant impeccable reference files. At minimum, always consult:
-
-- [layout.md](layout.md) for layout, spacing, grid, container queries, optical adjustments
-- [typeset.md](typeset.md) for type hierarchy, font selection, web font loading, OpenType features (Reference Material section)
-
-Then add references based on the brief's needs:
-- Complex interactions or forms? Consult [interaction-design.md](interaction-design.md)
-- Animation or transitions? Consult [animate.md](animate.md) (Reference Material covers motion materials, durations, easing, perceived performance)
-- Color-heavy or themed? Consult [colorize.md](colorize.md) (Reference Material covers OKLCH, palette structure, dark mode, contrast)
-- Responsive requirements? Consult [adapt.md](adapt.md) (Reference Material covers breakpoints, input methods, safe areas, responsive images)
-- Heavy on copy, labels, or errors? Consult [clarify.md](clarify.md) (Reference Material covers button labels, error formula, voice/tone, translation)
+Consult the reference files the brief's needs demand (interaction-heavy → [interaction-design.md](interaction-design.md); animation → [animate.md](animate.md); color-heavy → [colorize.md](colorize.md); responsive-critical → [adapt.md](adapt.md); copy-heavy → [clarify.md](clarify.md)). SKILL.md's craft floor always applies; don't re-read what's already loaded.
 
 ## Step 3: Visual Direction & Assets (Harness-Gated)
 
-If the harness has **native image generation** (currently Codex via `image_gen`), this step is mandatory. **Stop and load [codex.md](codex.md)**. It covers palette generation, mock exploration, the approval loop, mock-fidelity inventory, and asset slicing via the `impeccable_asset_producer` subagent. Follow Steps A-F in that file, then return here for Step 4.
+If the harness has **native image generation** (currently Codex via `image_gen`), this step is mandatory: **stop and load [codex.md](codex.md)**, follow Steps A-F, then return here. Otherwise, state in one line that the generation step is skipped for lack of native image generation, then implement directly from the brief as the visual contract.
 
-If the harness lacks native image generation, **state in one line that the visual-direction-by-generation step is being skipped because the harness lacks native image generation, then proceed**. The one-line announcement is required; it forces a conscious decision instead of letting the step quietly evaporate. The brief is your only visual reference. Implement directly from it, treating any named anchor references and the brief's "Design Direction" as the contract.
-
-Whether you generated mocks or not: don't replace required imagery with generic cards, bullets, emoji, fake metrics, decorative CSS panels, or filler copy. Image-led briefs (restaurants, hotels, magazines, photography, hobbyist communities, food, travel, fashion, product) need real or sourced imagery in the build, not CSS scenery.
+Imagery obligations (real, verified assets; no CSS scenery where photographs belong) are defined in SKILL.md's modes and new-work.md; they bind here regardless of whether mocks were generated.
 
 ## Step 4: Build to Production Quality
 
-**Precondition.** If Step 3 routed you to codex.md (native image generation available), Steps A through D in that file must be complete before any code: questions answered, palette confirmed, mocks generated, one direction approved or delegated. **Do not mention implementation, file paths, or patch plans until that's done.** A confirmed shape brief is not enough; the model that compressed those gates is the model that already failed this flow.
-
-Implement the feature following the design brief. Build in passes so structure, visual system, states, motion/media, and responsive behavior each get deliberate attention. The list below is the definition of done, not inspiration.
-
-### Production bar
+Implement the feature following the design brief, in passes: structure, visual system, states, motion/media, responsive. SKILL.md's craft floor governs the visual bar; the engineering bar on top of it:
 
 - **Real content.** No placeholder copy, placeholder images, dead links, fake controls, or unused scaffold at presentation time.
-- **Preserve the approved mock's major ingredients.** Missing hero objects, world/product imagery, section structure, CTA/nav treatment, or distinctive motifs are blocking defects unless the user accepted the change.
-- **Semantic first.** Real headings, landmarks, labels, form associations, button/link semantics, accessible names, state announcements where needed.
-- **Deliberate spacing and alignment.** No default gaps, arbitrary margins, unbalanced whitespace, or accidental optical misalignment.
-- **Intentional typography.** Chosen loading strategy, clear hierarchy, readable measure, stable line breaks, no overflow at any width.
+- **Preserve the approved direction's major ingredients.** Missing hero objects, imagery, section structure, or signature motifs are blocking defects unless the user accepted the change.
+- **Semantic first.** Real headings, landmarks, labels, form associations, button/link semantics, accessible names.
 - **Realistic state coverage.** Default, hover, focus-visible, active, disabled, loading, error, success, empty, overflow, long/short text, first-run.
-- **Finished interaction quality.** Keyboard paths, touch targets, feedback timing, scroll behavior, state transitions, no hover-only functionality.
-- **Coherent icon set.** Use the project's established set; otherwise pick one library or use accessible text. Don't mix.
-- **Respect the build pipeline.** Edit source files and run the project's build (`npm run build` or equivalent). Don't write to `build/` / `dist/` / `.next/` with `cat`, heredoc, or Bash redirects; that skips asset hashing, image optimization, code splitting, and CSS extraction, and produces output the dev server won't serve.
-- **Verify image URLs before referencing them.** Use image-search MCP or web-fetch when available; guessed photo IDs ship as broken-image placeholders. Without verification, prefer fewer images you're confident about.
-- **Optimized imagery and media.** Correct dimensions, useful alt text, lazy loading below the fold, modern formats when practical, responsive `srcset`/`picture` for raster, no project-referenced asset left outside the workspace.
-- **Premium motion.** Use atmospheric blur, filter, mask, shadow, reveal when they improve the experience. Avoid casual layout-property animation, bound expensive effects, verify smoothness in-browser, respect reduced motion, and avoid choreography that blocks task completion.
-- **Maintainable.** Reusable local patterns, clear component boundaries, project conventions. No rasterized UI text or one-off hacks when a local pattern exists.
-- **Technically clean.** Production build passes, no console errors, no avoidable layout shift, no needless dependencies, no broken asset paths.
-- **Ask when uncertain.** If a discovery materially changes the brief or approved direction, stop and ask. Don't guess.
+- **Finished interaction quality.** Keyboard paths, touch targets, feedback timing, no hover-only functionality.
+- **Respect the build pipeline.** Edit source and run the project's build; never write to `build/`/`dist/` with redirects, which skips the asset pipeline.
+- **Technically clean.** Production build passes, no console errors, no avoidable layout shift, no needless dependencies.
+- **Ask when uncertain.** If a discovery materially changes the brief or approved direction, stop and ask (unattended: decide, record, proceed).
 
 ## Step 5: Iterate Visually
 
-Look at what you built like a designer would. Your eyes are whatever the harness gives you: a connected browser, a screenshotting tool, Playwright, or asking the user. Use them for responsive testing (mobile, tablet, desktop minimum) and general visual validation.
+Look at what you built like a designer would, with whatever eyes the harness gives you (browser, screenshot tool, Playwright, or the user). Responsive testing at mobile, tablet, desktop minimum; for long-form surfaces, inspect major sections individually. If a tool returns a file path, read the PNG back; a screenshot you didn't read doesn't count.
 
-If your tool returns a file path, read the PNG back into the conversation. A screenshot you didn't read doesn't count.
-
-For long-form brand surfaces, inspect major sections individually. Thumbnails hide spacing, clipping, and cascade defects.
-
-After the first pass, write an honest critique against the brief, the approved mock's major ingredients (hero silhouette, motifs, imagery, nav/CTA, density), and impeccable's DON'Ts. Patch material defects and re-inspect. **Don't invent defects to demonstrate iteration.** A confident "first pass clean, shipping" beats a fake fix.
-
-Actively check: responsive behavior (composes, not shrinks), every state (empty / error / loading / edge), craft details (spacing, alignment, hierarchy, contrast, motion timing, focus), performance basics. The exit bar: defensible in a high-end studio review.
-
-Detector or QA output is defect evidence only; never proof the work is finished.
+After the first pass, critique honestly against the brief and the approved direction, patch material defects, re-inspect. **Don't invent defects to demonstrate iteration**; a confident "first pass clean" beats a fake fix. Detector or QA output is defect evidence, never proof of completion.
 
 ## Step 6: Present
 
-Present the result to the user:
-- Show the feature in its primary state
-- Summarize the browser/viewports checked and the most important fixes made after inspection
-- Walk through the key states (empty, error, responsive)
-- Explain design decisions that connect back to the design brief and, when used, the chosen north-star mock. Include any accepted deviations from the mock; do not hide unimplemented mock ingredients.
-- Note any remaining limitations or follow-up risks honestly
-- Ask: "What's working? What isn't?"
+Show the feature in its primary state; summarize viewports checked and the important fixes made after inspection; walk through key states (empty, error, responsive); connect design decisions back to the brief and any chosen mock, including accepted deviations; note remaining limitations honestly. Ask: "What's working? What isn't?"
