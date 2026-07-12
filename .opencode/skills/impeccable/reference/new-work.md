@@ -1,10 +1,6 @@
 # New identity work
 
-You are reading this because nothing committed exists yet (greenfield), or the user asked for a redesign that discards the current look. Either way the task is the same: invent a visual identity that could not be mistaken for anyone else's, and build it to the craft floor. SKILL.md's rules all still apply; this file is the process that produces the identity.
-
-## The mode still governs
-
-Identity gets invented in every mode, but this playbook's energy lands differently per mode (SKILL.md's Registers section decides which applies). On Persuade and Experience surfaces, commitment is allowed to be loud. On Operate and Read surfaces, boldness means a committed **system**: a decisive typographic voice, an exact spacing rhythm, one owned accent, structure so clear it feels inevitable. The thesis of a Read surface is the content itself, served impeccably; the thesis of an Operate surface is the task, made effortless. Nothing you invent may stand between the visitor and what they came to do: a device that would impress a passerby but slow a reader fails its mode, however handsome.
+You are reading this because nothing committed exists yet (greenfield), or the user asked for a redesign that discards the current look. The task is the same either way: invent a visual identity that could not be mistaken for anyone else's, in the grammar of the surface's mode (SKILL.md's Registers section), and build it to the craft floor. SKILL.md's rules all still apply; this file is the process that produces the identity.
 
 ## Seed
 
@@ -16,13 +12,13 @@ Name one concrete subject, its audience, and the page's single job. The subject'
 
 ## Plan, self-check, build
 
-Plan a compact token system in your reasoning: palette, type, layout concept in one sentence, and a **signature**: the one element this page will be remembered by, drawn from the subject's world. A signature carries weight: sized and placed so the page organizes itself around it. The standard page skeleton is a default, not a given; derive structure from what the subject needs. Then audit the plan: work through what you'd produce for a similar brief from another client, and wherever the two plans converge (same palette family, same face, same skeleton), that part is your generic default, not a choice. Revise it, then build, deriving every color and type decision from the revised plan.
+Plan a compact token system in your reasoning: palette, type, layout concept in one sentence, and a **signature**: the one element this surface will be remembered by, drawn from the subject's world. A signature carries weight: sized and placed so the page organizes itself around it. The standard page skeleton is a default, not a given; derive structure from what the subject and the mode need. Then audit the plan: work through what you'd produce for a similar brief from another client, and wherever the two plans converge (same palette family, same face, same skeleton), that part is your generic default, not a choice. Revise it, then build, deriving every color and type decision from the revised plan.
 
-**The opening viewport is a thesis, not a header.** Open with the most characteristic thing in the subject's world, in whatever form it takes: the product visibly working, an artifact from that world, the signature itself at full scale. A headline over two buttons is the template answer; earn it or replace it. The memory test: if a stranger scrolled past this page once, what would they describe an hour later? If the honest answer is a mood ("clean", "tasteful"), the concept hasn't committed yet.
+**The first viewport is a thesis, not a header.** The visitor should meet the concept doing its job immediately: the work itself, the product working, the content answering, the task at hand. Generic chrome around a generic promise is the template answer; earn it or replace it. The memory test: if someone left after one viewport, what would they describe an hour later? If the honest answer is a mood ("clean", "tasteful"), the concept hasn't committed yet.
 
-**Everything bold, nothing bland.** Bold is not decoration and not clutter; it is commitment to the concept, carried through every section. Commitment takes whatever form the concept demands: maximal or severely clean, drenched in color or nearly monochrome, copy so precise it stings, the product demonstrating itself instead of being described. A spare page built on one uncompromising idea is bold; a busy page of tasteful defaults is bland. The signature is where the concept peaks, not the only place it lives; cut anything that neither advances the concept nor serves the brief. Polish is the floor, not the point: when torn between refined and committed, commit.
+**Everything bold, nothing bland.** Bold is not decoration and not clutter; it is commitment to the concept, carried through every section. Commitment takes whatever form the concept and the mode demand: maximal or severely clean, drenched in color or nearly monochrome, copy so precise it stings, the product demonstrating itself, or a system so exact it feels inevitable (a decisive typographic voice, one owned accent, an unmistakable rhythm). A spare page built on one uncompromising idea is bold; a busy page of tasteful defaults is bland. The signature is where the concept peaks, not the only place it lives; cut anything that neither advances the concept nor serves the visitor's mode. Polish is the floor, not the point: when torn between refined and committed, commit.
 
-**Prove, don't claim.** A page earns belief by showing the product doing its job: the interface at work, the mechanism dramatized, numbers and specifics a competitor couldn't copy-paste. A reader should understand what it does by looking, before reading a word. Sections that restate the hero's claim in different words add length, not substance.
+**Prove, don't claim.** A surface earns belief by showing its subject doing its job: the interface at work, the mechanism dramatized, the content delivering, specifics a competitor couldn't copy-paste. The visitor should understand by looking, before reading a word. Sections that restate a claim in different words add length, not substance.
 
 ## Commit
 
@@ -32,11 +28,11 @@ Pick a color strategy before picking colors: Restrained (neutrals + one accent; 
 - Palette IS voice: a calm brand and a restless brand should not share palette mechanics, and each new surface differentiates from the last.
 - When a cultural-symbol palette is the obvious pull, reach past it. Let the cultural reading come from typography, imagery, and copy, not the palette.
 
-## Type and imagery for new Persuade and Experience surfaces
+## Type and imagery
 
-Choose faces like objects from the brand's world; these training-data defaults mean you stopped looking: Fraunces, Playfair Display, Cormorant, Lora, Crimson, Newsreader, Syne, Space Grotesk, Space Mono, IBM Plex, Inter-as-display, DM Sans, DM Serif, Outfit, Plus Jakarta Sans, Instrument Sans. (For Operate and Read surfaces the opposite holds: system stacks and workhorse UI faces are legitimate and often correct.)
+Choose faces like objects from the subject's world, in the mode's register: Operate and Read surfaces are well served by system stacks and workhorse UI faces; Persuade and Experience surfaces want faces with a point of view, and these training-data defaults mean you stopped looking: Fraunces, Playfair Display, Cormorant, Lora, Crimson, Newsreader, Syne, Space Grotesk, Space Mono, IBM Plex, Inter-as-display, DM Sans, DM Serif, Outfit, Plus Jakarta Sans, Instrument Sans.
 
-Imagery-implying briefs (food, travel, place, product, fashion) must ship real, verified imagery, searched for the brand's physical object rather than the category; a colored rectangle where a photo belongs reads as incomplete, and one decisive photo beats five mediocre ones. Verify stock URLs resolve before shipping them.
+Briefs that imply imagery (food, travel, place, product, fashion) must ship real, verified imagery, searched for the subject's physical object rather than the category; a colored rectangle where a photo belongs reads as incomplete, and one decisive photo beats five mediocre ones. Verify stock URLs resolve before shipping them.
 
 ## Calibration
 
