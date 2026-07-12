@@ -32,9 +32,9 @@ const ANTIPATTERNS = [
     id: 'single-font',
     category: 'slop',
     scopes: ['type'],
-    name: 'Single font for everything',
+    name: 'Single font without hierarchy',
     description:
-      'Only one font family is used for the entire page. Pair a distinctive display font with a refined body font to create typographic hierarchy.',
+      'Only one font family is used for the entire page. A single family can work when weight and size contrast carry the hierarchy; otherwise pair a distinctive display font with a refined body font.',
     skillSection: 'Typography',
     skillGuideline: 'only one font family for the entire page',
   },

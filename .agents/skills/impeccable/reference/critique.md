@@ -56,7 +56,7 @@ Evaluate:
 - **Holistic design**: hierarchy, IA, emotional fit, discoverability, composition, typography, color, accessibility, states, copy, and edge cases.
 - **Cognitive load**: consult the [Cognitive Load Assessment](#cognitive-load-assessment) section below; report checklist failures and decision points with >4 visible options.
 - **Emotional journey**: peak-end rule, emotional valleys, reassurance at high-stakes moments.
-- **Nielsen heuristics**: consult the [Heuristics Scoring Guide](#heuristics-scoring-guide) section below; score all 10 heuristics 0-4.
+- **Nielsen heuristics**: consult the [Heuristics Scoring Guide](#heuristics-scoring-guide) section below; score all 10 heuristics 0-4, marking any heuristic the mode-applicability rule allows as `n/a` instead of forcing a number.
 
 Return: AI slop verdict, heuristic scores, cognitive load, emotional journey, 2-3 strengths, 3-5 priority issues, persona red flags, minor observations, and provocative questions.
 
@@ -127,6 +127,8 @@ Present the Nielsen's 10 heuristics scores as a table:
 | **Total** | | **??/40** | **[Rating band]** |
 
 Be honest with scores. A 4 means genuinely excellent. Most real interfaces score 20-32.
+
+**Mode applicability**: heuristics 7 (Flexibility and Efficiency) and 10 (Help and Documentation) may be scored `n/a` on Persuade and Experience surfaces (landing pages, campaigns, portfolios, bodies of work), as may any other heuristic that genuinely cannot apply to the surface under review. Write `n/a` in the Score cell with a one-line reason, and renormalize the total to the applicable maximum (e.g. **24/32** when two heuristics are n/a) so the rating band stays proportional. The persisted snapshot must record which heuristics were scored n/a.
 
 #### Anti-Patterns Verdict
 
@@ -343,11 +345,11 @@ At any decision point, count the number of distinct options, actions, or pieces 
 - **8+ items**: Overloaded; users will skip, misclick, or abandon
 
 **Practical applications**:
-- Navigation menus: ≤5 top-level items (group the rest under clear categories)
-- Form sections: ≤4 fields visible per group before a visual break
 - Action buttons: 1 primary, 1–2 secondary, group the rest in a menu
-- Dashboard widgets: ≤4 key metrics visible without scrolling
-- Pricing tiers: ≤3 options (more causes analysis paralysis)
+- Navigation menus: ≤5 top-level items (group the rest under clear categories)
+- Long-form articles: one reading path; gather related links into a single block at the end instead of scattering them mid-flow
+- Documentation sidebars: ≤4 sibling choices visible per level before grouping kicks in
+- Portfolio and gallery indexes: one decision per screen (which piece to open), not filter, sort, and tag controls all at once
 
 ---
 

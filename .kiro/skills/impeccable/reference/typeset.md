@@ -6,7 +6,7 @@ Typography carries most of the information on the page. Replace generic defaults
 
 New identity work: run the font selection procedure in [new-work.md](new-work.md). Fluid `clamp()` scale, ≥1.25 ratio between steps.
 
-Product: system fonts and familiar sans stacks are legitimate here. One well-tuned family typically carries the whole UI. Fixed `rem` scale, 1.125–1.2 ratio between more closely-spaced steps.
+Operate + Read: system fonts and familiar sans stacks are legitimate here. One well-tuned family typically carries the whole UI. Fixed `rem` scale, 1.125–1.2 ratio between more closely-spaced steps. Long-form Read content wants a steady reading measure and a quiet, stable scale, not display-scale drama.
 
 ---
 
@@ -47,7 +47,7 @@ This checklist is sub-agent A's brief (on the fallback path, work through it you
 3. **Sizing & scale**:
    - Is there a consistent type scale, or are sizes arbitrary?
    - Does body text meet minimum readability? (16px+)
-   - Is the sizing strategy appropriate for the context? (Fixed `rem` scales for app UIs; fluid `clamp()` for marketing/content page headings)
+   - Is the sizing strategy appropriate for the context? (Fixed `rem` scales for app UIs and long-form reading, where a steady measure beats display scale; fluid `clamp()` for marketing-page headings)
 
 4. **Readability**:
    - Are line lengths comfortable? (45-75 characters ideal)

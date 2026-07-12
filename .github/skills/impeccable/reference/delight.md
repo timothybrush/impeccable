@@ -6,9 +6,9 @@ Find the moments where personality and unexpected polish would turn a functional
 
 ## Register
 
-Brand: delight can be distributed across copy voice, section transitions, discovery rewards, seasonal touches, personality across the whole surface.
+Persuade + Experience: delight can be distributed across copy voice, section transitions, discovery rewards, seasonal touches, personality across the whole surface.
 
-Product: delight at specific moments, not pages. Completion, first-time actions, error recovery, milestone crossings. Reliability and consistency carry the rest of the experience; delight pushed everywhere reads as noise.
+Operate + Read: delight at specific moments, not pages. Completion, first-time actions, error recovery, milestone crossings. Reliability and consistency carry the rest of the experience; delight pushed everywhere reads as noise.
 
 ---
 
@@ -128,8 +128,8 @@ Add personality and joy through these methods:
 "No projects"
 "Your canvas awaits. Create something amazing."
 
-"No messages"
-"Inbox zero! You're crushing it today."
+"No saved articles"
+"Nothing on the nightstand yet. Save a story for later."
 ```
 
 **Playful labels & tooltips**:
@@ -178,7 +178,7 @@ Add personality and joy through these methods:
 - Haptic feedback on mobile
 - Optional sound effect
 
-**Progress & achievements**:
+**Progress & achievements** (Operate surfaces with recurring tasks only; gamification on editorial, portfolio, or one-visit surfaces reads as noise):
 - Streak counters with celebratory milestones
 - Progress bars that "celebrate" at 100%
 - Badge unlocks with animation
@@ -212,7 +212,7 @@ Add personality and joy through these methods:
 - Hidden keyboard shortcuts (Cmd+K for special features)
 - Hover reveals on logos or illustrations
 - Alt text jokes on images (for screen reader users too!)
-- Console messages for developers ("Like what you see? We're hiring!")
+- A view-source or console colophon (a note on the typefaces, a thank-you, a hiring line)
 
 **Seasonal touches**:
 - Holiday themes (subtle, tasteful)
@@ -237,10 +237,10 @@ Add personality and joy through these methods:
 
 ```
 Loading messages: write ones specific to your product, not generic AI filler:
-- "Crunching your latest numbers..."
 - "Syncing with your team's changes..."
-- "Preparing your dashboard..."
-- "Checking for updates since yesterday..."
+- "Fetching this week's issue..."
+- "Developing your photos..."
+- "Checking tomorrow's tide tables..."
 ```
 
 **WARNING**: Avoid cliched loading messages like "Herding pixels", "Teaching robots to dance", "Consulting the magic 8-ball", "Counting backwards from infinity". These are AI-slop copy, instantly recognizable as machine-generated. Write messages that are specific to what your product actually does.
@@ -254,7 +254,7 @@ Loading messages: write ones specific to your product, not generic AI filler:
 - "Achievement unlocked" style notifications
 - Personalized messages ("You published your 10th article!")
 
-**Milestone recognition**:
+**Milestone recognition** (same scoping as Progress & achievements: Operate surfaces with recurring tasks):
 - First-time actions get special treatment
 - Streak tracking and celebration
 - Progress toward goals

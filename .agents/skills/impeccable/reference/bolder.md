@@ -4,9 +4,9 @@ When asked for "bolder," AI defaults to the same tired tricks: cyan/purple gradi
 
 ## Register
 
-Brand: "bolder" means distinctive. Express a stronger point of view through hierarchy, pacing, proportion, copy, evidence, and one committed visual idea.
+Persuade + Experience: "bolder" means distinctive. Express a stronger point of view through hierarchy, pacing, proportion, copy, evidence, and one committed visual idea.
 
-Product: "bolder" rarely means theatrics; those undermine trust. It means stronger hierarchy, clearer weight contrast, sharper information density, and more decisive prioritization. The amplification is in clarity, not drama.
+Operate + Read: "bolder" rarely means theatrics; those undermine trust. It means stronger hierarchy, clearer weight contrast, sharper information density, and more decisive prioritization. The amplification is in clarity, not drama.
 
 ---
 

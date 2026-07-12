@@ -6,9 +6,9 @@ Add motion that conveys state, gives feedback, and clarifies hierarchy. Cut moti
 
 ## Register
 
-Brand: motion is part of the voice; one well-rehearsed entrance beats scattered micro-interactions. The saturated AI default is fade-and-rise reveals on every scrolled section; that's a tell, not a choreography. Reserve scroll-triggered motion for moments that earn it.
+Persuade + Experience: motion is part of the voice; one well-rehearsed entrance beats scattered micro-interactions. The saturated AI default is fade-and-rise reveals on every scrolled section; that's a tell, not a choreography. Reserve scroll-triggered motion for moments that earn it.
 
-Product: 150–250 ms on most transitions. Motion conveys state: feedback, reveal, loading, transitions between views. No page-load choreography; users are in a task and won't wait for it.
+Operate + Read: 150–250 ms on most transitions. Motion conveys state: feedback, reveal, loading, transitions between views. No page-load choreography; users are in a task and won't wait for it.
 
 Native (`ios` / `android` / `adaptive`): implementation follows the Motion section of [ios.md](ios.md) / [android.md](android.md) (read it first if Setup hasn't already): system transitions and OS Reduce Motion, never the web tooling below.
 
@@ -39,9 +39,9 @@ If any of these are unclear from the codebase, {{ask_instruction}}
 
 Create a purposeful animation plan:
 
-- **Hero moment**: What's the ONE signature animation? (Page load? Hero section? Key interaction?)
 - **Feedback layer**: Which interactions need acknowledgment?
 - **Transition layer**: Which state changes need smoothing?
+- **Entrance moment**: The ONE entrance worth rehearsing, where the mode invites it. Not every surface wants one.
 - **Delight layer**: Where can we surprise and delight?
 
 **IMPORTANT**: One well-orchestrated experience beats scattered animations everywhere. Focus on high-impact moments.
@@ -49,13 +49,6 @@ Create a purposeful animation plan:
 ## Implement Animations
 
 Add motion systematically across these categories:
-
-### Entrance Animations
-- **Hero section**: Dramatic entrance for primary content (scale, parallax, or creative effects)
-- **Modal/drawer entry**: Smooth slide + fade, backdrop fade, focus management
-- **List rhythm**: Sibling stagger is legitimate for cards-in-a-grid or list-items-appearing. Whole-section fade-on-scroll is not a list and is not legitimate. Cap total stagger time: 10 items at 50ms each = 500ms total. For more items, reduce per-item delay or cap the staggered count.
-
-  Use CSS custom properties for clean stagger: `animation-delay: calc(var(--i, 0) * 50ms)` with `style="--i: 0"`, `style="--i: 1"`, etc. on each item.
 
 ### Micro-interactions
 - **Button feedback**:
@@ -75,6 +68,13 @@ Add motion systematically across these categories:
 - **Loading states**: Skeleton screen fades, spinner animations, progress bars
 - **Success/error**: Color transitions, icon animations, gentle scale pulse
 - **Enable/disable**: Opacity transitions, cursor changes
+
+### Entrance Animations
+- **The one entrance moment** (where the mode invites it): a committed entrance for primary content (scale, parallax, or a creative effect)
+- **Modal/drawer entry**: Smooth slide + fade, backdrop fade, focus management
+- **List rhythm**: Sibling stagger is legitimate for cards-in-a-grid or list-items-appearing. Whole-section fade-on-scroll is not a list and is not legitimate. Cap total stagger time: 10 items at 50ms each = 500ms total. For more items, reduce per-item delay or cap the staggered count.
+
+  Use CSS custom properties for clean stagger: `animation-delay: calc(var(--i, 0) * 50ms)` with `style="--i: 0"`, `style="--i: 1"`, etc. on each item.
 
 ### Navigation & Flow
 - **Page transitions**: Crossfade between routes, shared element transitions

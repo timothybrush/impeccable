@@ -64,7 +64,7 @@ Common ingredients to inventory:
 
 - Hero silhouette and dominant composition
 - Signature motifs (planets, devices, portraits, charts, route lines, insets, badges, etc.)
-- Nav and primary CTA treatment
+- Nav and primary-action treatment (when the surface has one)
 - Section sequence, especially the second fold
 - Image-native content the concept depends on
 - Typography, density, color/material treatment, motion cues

@@ -65,19 +65,19 @@ If the repo is empty or the user's brief is sparse, run a short interview before
 - Use inferred answers as hypotheses or options, not as finished facts.
 - Complete at least one real user-answer round before drafting PRODUCT.md, unless every required answer is directly discoverable from repo docs.
 - Round 1 should establish register, platform, users, purpose, positioning, and desired outcome.
-- Round 2 should establish brand personality or references, anti-references, and accessibility needs, plus conversion & proof for the brand register.
+- Round 2 should establish brand personality or references, anti-references, and accessibility needs, plus conversion & proof for Persuade surfaces.
 
 ### Minimum viable interview
 
-Ask enough to complete PRODUCT.md. At minimum, cover register confirmation, **platform confirmation** (`web` / `ios` / `android` / `adaptive`), users, purpose, positioning, brand personality, anti-references, and accessibility needs (plus conversion & proof for the brand register) unless each answer is directly discoverable from repo context. Never let the template's default `web` stand unconfirmed for a native or cross-platform repo. After at least one interview round, you may propose inferred answers, but the user must confirm them before you write PRODUCT.md. Never synthesize PRODUCT.md from the original task prompt alone.
+Ask enough to complete PRODUCT.md. At minimum, cover register confirmation, **platform confirmation** (`web` / `ios` / `android` / `adaptive`), users, purpose, positioning, brand personality, anti-references, and accessibility needs (plus conversion & proof for Persuade surfaces) unless each answer is directly discoverable from repo context. Never let the template's default `web` stand unconfirmed for a native or cross-platform repo. After at least one interview round, you may propose inferred answers, but the user must confirm them before you write PRODUCT.md. Never synthesize PRODUCT.md from the original task prompt alone.
 
 ### Register (ask first; it shapes everything below)
 
-Every design task is either **brand** (marketing, landing, campaign, long-form content, portfolio: design IS the product) or **product** (app UI, admin, dashboards, tools: design SERVES the product).
+Every design task serves one of four visitor modes (see SKILL.md's Registers): **Persuade** (marketing, landing, campaigns), **Experience** (portfolios, albums, bodies of work), **Operate** (app UI, admin, dashboards, tools), and **Read** (documentation, editorial, long-form). PRODUCT.md stores the two-value family that covers them: `brand` covers Persuade and Experience, `product` covers Operate and Read. The brief decides the exact mode per task; the stored register only sets the default family.
 
 If Step 2 produced a clear hypothesis, lead with it: *"From the codebase, this looks like a [brand / product] surface. Does that match your intent, or should we treat it differently?"*
 
-If the signal is genuinely split (e.g. a product with a big marketing landing), STOP and use Codex's structured user-input/question tool when available; if unavailable, ask directly in chat to clarify what you cannot infer. Ask which register describes the **primary** surface. The register can be overridden per task later, but PRODUCT.md carries one default. Settle the default before drafting any register-dependent questions; never batch brand-only questions (Conversion & proof) into the same round as the question that decides the register.
+If the signal is genuinely split (e.g. a product with a big marketing landing), STOP and use Codex's structured user-input/question tool when available; if unavailable, ask directly in chat to clarify what you cannot infer. Ask which register describes the **primary** surface. The register can be overridden per task later, but PRODUCT.md carries one default. Settle the default before drafting any register-dependent questions; never batch Persuade-only questions (Conversion & proof) into the same round as the question that decides the register.
 
 ### Platform (ask right after register)
 
@@ -106,7 +106,10 @@ A monorepo shipping both a website and a native app gets a PRODUCT.md per app, e
   - Push for specific named references with the *specific* thing about them that fits this brand, not generic "modern" adjectives or category-bucket lanes.
 - What should this explicitly NOT look like? Any anti-references?
 
-### Conversion & proof (brand register only)
+### Conversion & proof (Persuade surfaces only)
+
+Ask these only when the primary surface is a Persuade one (marketing, landing, campaigns). Experience and Read surfaces (portfolios, albums, long-form writing, documentation) get no CTA, belief-ladder, or proof questions even when the stored register is `brand`; skip this section and its PRODUCT.md counterpart.
+
 - What's the primary CTA?
 - What's the secondary fallback, for visitors not ready for the primary?
 - The one line a visitor should remember after 10 seconds.
@@ -146,7 +149,7 @@ web
 [The single strategic claim every screen reinforces. Not a visual rule, not an anti-reference.]
 
 ## Conversion & proof
-[Brand register only. Product register: omit this section entirely, heading included.]
+[Persuade surfaces only (marketing, landing, campaigns). Omit this section entirely, heading included, for the product register and for Experience or Read surfaces such as portfolios, albums, or long-form writing.]
 - Primary and secondary CTA: [...]
 - The line a visitor remembers after 10 seconds: [...]
 - Belief ladder: [...]

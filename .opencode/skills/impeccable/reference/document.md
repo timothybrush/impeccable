@@ -274,7 +274,7 @@ Regenerate the sidecar whenever you regenerate root `DESIGN.md`. If the user onl
       "kind": "button | input | nav | chip | card | custom",
       "refersTo": "button-primary",
       "description": "One-line what and when.",
-      "html": "<button class=\"ds-btn-primary\">GET STARTED</button>",
+      "html": "<button class=\"ds-btn-primary\">SAVE CHANGES</button>",
       "css": ".ds-btn-primary { background: #191c1d; color: #fff; padding: 16px 48px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; border: none; border-radius: 0; transition: background 0.2s, transform 0.2s; } .ds-btn-primary:hover { background: oklch(60% 0.25 350); transform: translateY(-2px); }"
     }
   ],
@@ -307,7 +307,7 @@ The `html` and `css` fields must be **self-contained, drop-in snippets** that re
 Aim for a tight set of **5-10 components** that best represent the visual system:
 
 - **Canonical primitives (always include if the project has them):** button (each variant as a separate component entry), input/text field, navigation, chip/tag, card.
-- **Signature components (include if distinctive):** hero CTA, featured card, filter pill, any custom pattern the user mentioned as important in PRODUCT.md.
+- **Signature components (include if distinctive):** hero CTA, featured card, filter pill, a distinctive table or list-row treatment, any custom pattern the user mentioned as important in PRODUCT.md.
 - **Skip the rest.** Utility components, form building blocks, wrapper layouts: not worth documenting unless visually distinctive.
 
 If the project has **no component library yet** (bare landing page, new project), synthesize canonical primitives from the tokens using best-practice defaults consistent with the DESIGN.md's rules. Every `.impeccable/design.json` has *something* to render, even on day zero.

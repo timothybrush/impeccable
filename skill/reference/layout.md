@@ -4,9 +4,9 @@ Space is the most underused design tool. Find the layout's actual problem (monot
 
 ## Register
 
-Brand: asymmetric compositions, fluid spacing with `clamp()`, intentional grid-breaking for emphasis. Rhythm through contrast: tight groupings paired with generous separations.
+Persuade + Experience: asymmetric compositions, fluid spacing with `clamp()`, intentional grid-breaking for emphasis. Rhythm through contrast: tight groupings paired with generous separations.
 
-Product: predictable grids, consistent densities, familiar navigation patterns. Responsive behavior is structural (collapse sidebar, responsive table), not fluid typography. Consistency IS an affordance.
+Operate + Read: predictable grids, consistent densities, familiar navigation patterns. Responsive behavior is structural (collapse sidebar, responsive table), not fluid typography. Consistency IS an affordance. Read surfaces specifically want navigable linearity: a steady column the reader can follow and a structure they can hold in their head, not compositional surprise.
 
 Native (`ios` / `android` / `adaptive`): structure follows the Layout section of [ios.md](ios.md) / [android.md](android.md) (read it first if Setup hasn't already): platform navigation, insets, and touch targets, never the CSS tooling below.
 
