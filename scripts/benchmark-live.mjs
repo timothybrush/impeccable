@@ -316,8 +316,10 @@ function createSplitProgressiveAgent(agent) {
 
 async function waitForFirstVariant(page) {
   const handle = await page.waitForFunction(() => {
-    const wrappers = [...document.querySelectorAll('[data-impeccable-variant]')];
-    return wrappers.some((element) => element.getAttribute('data-impeccable-variant') !== 'original');
+    const activeGeneration = document.querySelector('[data-impeccable-variants]');
+    if (!activeGeneration) return false;
+    const variants = [...activeGeneration.querySelectorAll('[data-impeccable-variant]')];
+    return variants.some((element) => element.getAttribute('data-impeccable-variant') !== 'original');
   }, undefined, { timeout: 150_000 });
   await handle.dispose();
 }
