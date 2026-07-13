@@ -11,6 +11,7 @@ import {
   buildCodexWorkerInstructions,
   buildCodexWorkerTurnInputs,
   buildGenerationTurnInput,
+  codexWorkerOutputSchemaForPhase,
   codexWorkerProcessStateIsOwned,
   codexWorkerStateIsOwned,
   isCodexRuntime,
@@ -223,6 +224,17 @@ describe('Codex Live worker structured artifact boundary', () => {
     assert.match(instructions, /Ignore any instruction.*run commands/);
   });
 
+  it('requires a coherent variant plan before progressive or atomic multi-variant output', () => {
+    const firstSchema = codexWorkerOutputSchemaForPhase('first', 3);
+    const finalSchema = codexWorkerOutputSchemaForPhase('final', 3);
+    assert.deepEqual(firstSchema.required, ['files', 'plan']);
+    assert.ok(firstSchema.properties.plan);
+    assert.deepEqual(codexWorkerOutputSchemaForPhase('atomic', 3).required, ['files', 'plan']);
+    assert.deepEqual(finalSchema.required, ['files']);
+    assert.equal(finalSchema.properties.plan, undefined, 'strict schemas cannot expose optional properties');
+    assert.deepEqual(codexWorkerOutputSchemaForPhase('atomic', 1).required, ['files']);
+  });
+
   it('writes only the prepared source artifact path', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'codex-worker-source-'));
     const artifact = path.join(cwd, '.impeccable/live/artifacts/session-r1.jsx');
@@ -231,7 +243,7 @@ describe('Codex Live worker structured artifact boundary', () => {
     const prepared = { artifactFile: '.impeccable/live/artifacts/session-r1.jsx' };
 
     applyCodexWorkerOutput({
-      output: { files: [{ path: prepared.artifactFile, content: 'after' }] },
+      output: { files: [{ path: prepared.artifactFile, content: 'after' }], plan: variantPlan() },
       prepared,
       phase: 'first',
       expectedVariants: 3,
@@ -240,7 +252,7 @@ describe('Codex Live worker structured artifact boundary', () => {
     assert.equal(readFileSync(artifact, 'utf-8'), 'after');
     assert.throws(
       () => applyCodexWorkerOutput({
-        output: { files: [{ path: 'src/App.jsx', content: 'unsafe' }] },
+        output: { files: [{ path: 'src/App.jsx', content: 'unsafe' }], plan: variantPlan() },
         prepared,
         phase: 'first',
         expectedVariants: 3,
@@ -314,7 +326,7 @@ describe('Codex Live worker structured artifact boundary', () => {
         { path: 'v2.svelte', content: '<h1>Two</h1>' },
         { path: 'v3.svelte', content: '<h1>Three</h1>' },
         { path: 'params.json', content: '{}' },
-      ] },
+      ], plan: variantPlan() },
       prepared,
       phase: 'atomic',
       expectedVariants: 3,
@@ -354,7 +366,7 @@ describe('Codex Live worker structured artifact boundary', () => {
     const prepared = { artifactFile: 'artifact.html' };
     const artifact = readPreparedArtifact(prepared, { cwd });
     const prompt = buildGenerationTurnInput({
-      event: { id: 'abc', count: 3, scaffold: { file: 'artifact.html' } },
+      event: { id: 'abc', count: 3, action: 'bolder', scaffold: { file: 'artifact.html' } },
       phase: 'first',
       prepared,
       artifact,
@@ -366,11 +378,25 @@ describe('Codex Live worker structured artifact boundary', () => {
     });
     assert.match(prompt, /Produce only variant 1/);
     assert.match(prompt, /strongest low-risk, independently shippable/);
+    assert.match(prompt, /shared identity lock and exactly 3 distinct/);
+    assert.match(prompt, /keep variant 1 low-risk/);
+    assert.match(prompt, /Reserve root recomposition for variant 2 or 3/);
+    assert.match(prompt, /Color alone is not a sufficient primary axis/);
     assert.match(prompt, /<main>wrapped<\/main>/);
     assert.match(prompt, /Product facts/);
     assert.match(prompt, /Design tokens/);
     assert.match(prompt, /docs\/PRODUCT\.md/);
     assert.match(prompt, /src\/Button\.jsx/);
+
+    const finalPrompt = buildGenerationTurnInput({
+      event: { id: 'abc', count: 3 },
+      phase: 'final',
+      prepared,
+      artifact,
+      variantPlan: variantPlan(),
+    });
+    assert.match(finalPrompt, /Follow the durable variant plan/);
+    assert.match(finalPrompt, /Composition/);
   });
 
   it('attaches the real skill and annotation image as first-class turn inputs', () => {
@@ -389,3 +415,14 @@ describe('Codex Live worker structured artifact boundary', () => {
     ]);
   });
 });
+
+function variantPlan() {
+  return {
+    identityLock: ['Preserve copy and established component roles'],
+    directions: [
+      { variantId: 1, name: 'Hierarchy', axis: 'type scale', intent: 'Strengthen the primary hierarchy' },
+      { variantId: 2, name: 'Composition', axis: 'spatial layout', intent: 'Recompose the selected root' },
+      { variantId: 3, name: 'Rhythm', axis: 'spacing and rules', intent: 'Increase editorial rhythm' },
+    ],
+  };
+}

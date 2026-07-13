@@ -455,12 +455,25 @@ describe('Codex Live worker supervisor ownership and lifecycle', () => {
     const final = '<main><div data-impeccable-variants="codexprogress"><style data-impeccable-css="codexprogress">@scope ([data-impeccable-variant="1"]) { h1 { color: red; } }\n@scope ([data-impeccable-variant="2"]) { h1 { color: green; } }\n@scope ([data-impeccable-variant="3"]) { h1 { color: blue; } }</style><div data-impeccable-variant="original"><h1>Original</h1></div><div data-impeccable-variant="1"><h1>One</h1></div><div data-impeccable-variant="2"><h1>Two</h1></div><div data-impeccable-variant="3"><h1>Three</h1></div></div></main>';
     const client = fakeClient();
     let turn = 0;
+    const prompts = [];
+    const plan = {
+      identityLock: ['Preserve copy and shared component roles'],
+      directions: [
+        { variantId: 1, name: 'Hierarchy', axis: 'type scale', intent: 'Strengthen hierarchy' },
+        { variantId: 2, name: 'Composition', axis: 'layout', intent: 'Recompose the root' },
+        { variantId: 3, name: 'Rhythm', axis: 'spacing', intent: 'Increase rhythm' },
+      ],
+    };
     client.startTurn = async ({ input, onStarted, onAgentMessage }) => {
       turn += 1;
       onStarted?.(`turn-${turn}`);
       const prompt = input.find((item) => item.type === 'text').text;
+      prompts.push(prompt);
       const artifactPath = JSON.parse(prompt.match(/Return exactly one file whose path is ("[^"]+")/)[1]);
-      const message = JSON.stringify({ files: [{ path: artifactPath, content: turn === 1 ? first : final }] });
+      const message = JSON.stringify({
+        files: [{ path: artifactPath, content: turn === 1 ? first : final }],
+        ...(turn === 1 ? { plan } : {}),
+      });
       await Promise.all([
         onAgentMessage?.(message),
         onAgentMessage?.(message),
@@ -506,6 +519,8 @@ describe('Codex Live worker supervisor ownership and lifecycle', () => {
     const snapshot = createLiveSessionStore({ cwd, sessionId }).getSnapshot(sessionId, { includeCompleted: true });
     assert.equal(snapshot.arrivedVariants, 3);
     assert.equal(snapshot.publishedRevision, 2);
+    assert.deepEqual(snapshot.variantPlan, plan);
+    assert.match(prompts[1], /"name": "Composition"/);
   });
 });
 

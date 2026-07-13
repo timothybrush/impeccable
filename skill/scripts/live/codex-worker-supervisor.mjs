@@ -12,11 +12,11 @@ import { loadContext } from '../context.mjs';
 
 import {
   CODEX_WORKER_OWNER,
-  CODEX_WORKER_OUTPUT_SCHEMA,
   applyCodexWorkerOutput,
   buildCodexWorkerInstructions,
   buildCodexWorkerTurnInputs,
   buildGenerationTurnInput,
+  codexWorkerOutputSchemaForPhase,
   codexWorkerStateIsOwned,
   generationIsCanceled,
   prepareCodexWorkerPhase,
@@ -305,6 +305,7 @@ export class CodexLiveWorkerSupervisor {
       phase,
       prepared,
       artifact,
+      variantPlan: this.sessionStore.getSnapshot(event.id, { includeCompleted: true })?.variantPlan || null,
       ...contexts,
     });
     const input = buildCodexWorkerTurnInputs({
@@ -325,7 +326,7 @@ export class CodexLiveWorkerSupervisor {
             phase: phase === 'final' ? 'remaining_variants_validating' : 'first_variant_validating',
             durationMs: Date.now() - phaseStartedAt,
           });
-          applyCodexWorkerOutput({
+          const applied = applyCodexWorkerOutput({
             output: answer,
             prepared,
             phase,
@@ -333,6 +334,9 @@ export class CodexLiveWorkerSupervisor {
             cwd: this.cwd,
             maxBytes: this.config.maxArtifactBytes,
           });
+          if (applied.plan) {
+            this.sessionStore.appendEvent({ type: 'variant_plan', id: event.id, plan: applied.plan });
+          }
           if (this.isCanceled(event.id)) return;
           const published = publishCodexWorkerPhase({ event, prepared, arrivedVariants, cwd: this.cwd });
           await this.publishCheckpoint(this.base, this.token, {
@@ -356,7 +360,7 @@ export class CodexLiveWorkerSupervisor {
     if (this.isCanceled(event.id)) return;
     const result = await this.runTurnWithReconnect({
       input,
-      outputSchema: CODEX_WORKER_OUTPUT_SCHEMA,
+      outputSchema: codexWorkerOutputSchemaForPhase(phase, Number(event.count || arrivedVariants)),
       onAgentMessage: publishCandidate,
       eventId: event.id,
     });

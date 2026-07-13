@@ -62,6 +62,24 @@ describe('live-session-store', () => {
     assert.equal(active[0].id, 'session-a');
   });
 
+  it('persists the progressive variant plan across worker restarts', () => {
+    const store = createLiveSessionStore({ cwd: tmp, sessionId: 'planned-session' });
+    const plan = {
+      identityLock: ['Preserve copy'],
+      directions: [
+        { variantId: 1, name: 'Hierarchy', axis: 'scale', intent: 'Increase hierarchy' },
+        { variantId: 2, name: 'Composition', axis: 'layout', intent: 'Recompose the root' },
+        { variantId: 3, name: 'Rhythm', axis: 'spacing', intent: 'Increase rhythm' },
+      ],
+    };
+    store.appendEvent({ type: 'generate', id: 'planned-session', count: 3 });
+    store.appendEvent({ type: 'variant_plan', id: 'planned-session', plan });
+    store.appendEvent({ type: 'checkpoint', id: 'planned-session', revision: 1, arrivedVariants: 1 });
+
+    const restarted = createLiveSessionStore({ cwd: tmp, sessionId: 'planned-session' });
+    assert.deepEqual(restarted.getSnapshot('planned-session').variantPlan, plan);
+  });
+
   it('tombstones generation on early accept and ignores late generation writes', () => {
     const store = createLiveSessionStore({ cwd: tmp, sessionId: 'early-accept' });
     store.appendEvent({

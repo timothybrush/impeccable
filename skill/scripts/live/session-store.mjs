@@ -134,6 +134,7 @@ function baseSnapshot(id) {
     generationEpoch: 1,
     publishedRevision: 0,
     deliveredVariants: {},
+    variantPlan: null,
     generationCanceled: false,
     generationCanceledAt: null,
     cancelReason: null,
@@ -178,6 +179,7 @@ function applyEvent(snapshot, entry, inheritedDiagnostics = []) {
     sourceMarkers: { ...(snapshot.sourceMarkers || {}) },
     generationTimings: { ...(snapshot.generationTimings || {}) },
     deliveredVariants: { ...(snapshot.deliveredVariants || {}) },
+    variantPlan: snapshot.variantPlan || null,
     annotationArtifacts: [...(snapshot.annotationArtifacts || [])],
     diagnostics: [...(snapshot.diagnostics || [])],
     updatedAt: entry.ts || new Date().toISOString(),
@@ -195,7 +197,13 @@ function applyEvent(snapshot, entry, inheritedDiagnostics = []) {
       next.expectedVariants = event.count ?? next.expectedVariants;
       next.pendingEventSeq = entry.seq ?? next.pendingEventSeq;
       next.pendingEvent = toPendingEvent(event);
+      next.variantPlan = null;
       if (event.screenshotPath) upsertArtifact(next.annotationArtifacts, { type: 'screenshot', path: event.screenshotPath });
+      break;
+    case 'variant_plan':
+      if (!next.generationCanceled && !GENERATION_FENCED_PHASES.has(next.phase)) {
+        next.variantPlan = event.plan ?? next.variantPlan;
+      }
       break;
     case 'variant_published':
       if (next.generationCanceled || GENERATION_FENCED_PHASES.has(next.phase)) {

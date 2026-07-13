@@ -8,6 +8,35 @@ import {
 import { createLiveSessionStore } from './session-store.mjs';
 
 export const CODEX_WORKER_OWNER = 'impeccable-live-codex-worker-v1';
+const VARIANT_PLAN_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: {
+    identityLock: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 8,
+      items: { type: 'string', minLength: 1, maxLength: 240 },
+    },
+    directions: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 6,
+      items: {
+        type: 'object',
+        properties: {
+          variantId: { type: 'integer', minimum: 1, maximum: 6 },
+          name: { type: 'string', minLength: 1, maxLength: 80 },
+          axis: { type: 'string', minLength: 1, maxLength: 120 },
+          intent: { type: 'string', minLength: 1, maxLength: 300 },
+        },
+        required: ['variantId', 'name', 'axis', 'intent'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['identityLock', 'directions'],
+  additionalProperties: false,
+});
 export const CODEX_WORKER_OUTPUT_SCHEMA = Object.freeze({
   type: 'object',
   properties: {
@@ -28,6 +57,17 @@ export const CODEX_WORKER_OUTPUT_SCHEMA = Object.freeze({
   required: ['files'],
   additionalProperties: false,
 });
+
+export function codexWorkerOutputSchemaForPhase(phase, expectedVariants = 3) {
+  const requirePlan = Number(expectedVariants) > 1 && (phase === 'first' || phase === 'atomic');
+  return {
+    ...CODEX_WORKER_OUTPUT_SCHEMA,
+    properties: requirePlan
+      ? { ...CODEX_WORKER_OUTPUT_SCHEMA.properties, plan: VARIANT_PLAN_SCHEMA }
+      : CODEX_WORKER_OUTPUT_SCHEMA.properties,
+    required: requirePlan ? ['files', 'plan'] : ['files'],
+  };
+}
 
 export function resolveCodexWorkerConfig({ env = process.env, liveConfig = {} } = {}) {
   const configured = liveConfig.experimentalCodexWorker || liveConfig.codexWorker || {};
@@ -87,6 +127,7 @@ export function buildGenerationTurnInput({
   phase,
   prepared,
   artifact,
+  variantPlan,
   product,
   design,
   actionReference,
@@ -96,24 +137,35 @@ export function buildGenerationTurnInput({
   const count = Number(event.count || 3);
   const first = phase === 'first';
   const component = Boolean(prepared.previewMode);
+  const actionRules = event.action === 'bolder' && count > 1
+    ? [
+        'For /bolder, keep variant 1 low-risk: preserve the selected root’s high-level layout and create impact through controlled hierarchy, proportion, or rhythm. Reserve root recomposition for variant 2 or 3.',
+        'At least one later direction must recompose the selected root or materially change the spatial relationship among its children. The set must not merely restyle the same descendant three ways.',
+        'Color alone is not a sufficient primary axis for /bolder; pair any palette shift with a meaningful hierarchy, proportion, rhythm, or composition change.',
+      ]
+    : [];
   const phaseRules = first
     ? [
         'Produce only variant 1 now so it can be reviewed immediately.',
         'Variant 1 must be the strongest low-risk, independently shippable interpretation of the request; reserve more experimental directions for later variants.',
+        `Before authoring, define the shared identity lock and exactly ${count} distinct, meaningful design axes. Return them in plan.directions ordered by variantId so the final phase can complete the same coherent set.`,
         'Defer tunable parameters: params must be absent or empty for this phase.',
       ]
     : phase === 'final'
       ? [
           `Complete variants 2 through ${count} and the final parameter manifest.`,
           'Variant 1 is already visible and immutable. Do not return or alter its file, markup, or CSS.',
+          'Follow the durable variant plan below. Preserve its identity lock and implement each remaining named axis instead of improvising a new set.',
         ]
       : [
           `Produce the complete set of ${count} variants and final parameters atomically.`,
+          `Before authoring, define the shared identity lock and exactly ${count} distinct, meaningful design axes and return them in plan.directions ordered by variantId.`,
         ];
 
   return [
     `LIVE GENERATION PHASE: ${phase}`,
     ...phaseRules,
+    ...actionRules,
     component
       ? `Return staged component files relative to componentDir. Allowed variant extension: .${artifact.componentExtension}. The supervisor updates manifest.json.`
       : `Return exactly one file whose path is ${JSON.stringify(prepared.artifactFile)} and whose content is the complete staged source artifact.`,
@@ -124,6 +176,9 @@ export function buildGenerationTurnInput({
     '<event>',
     JSON.stringify(sanitizeEvent(event), null, 2),
     '</event>',
+    '<variant_plan>',
+    JSON.stringify(variantPlan || null, null, 2),
+    '</variant_plan>',
     '',
     '<product_context>',
     String(product || ''),
@@ -221,6 +276,9 @@ export function applyCodexWorkerOutput({
     totalBytes += Buffer.byteLength(file.content);
   }
   if (totalBytes > maxBytes) throw workerError('worker_output_too_large');
+  const requirePlan = Number(expectedVariants) > 1 && (phase === 'first' || phase === 'atomic');
+  if (requirePlan && !parsed.plan) throw workerError('worker_output_plan_missing');
+  const plan = parsed.plan ? normalizeVariantPlan(parsed.plan, expectedVariants) : null;
 
   if (!prepared.previewMode) {
     if (parsed.files.length !== 1 || parsed.files[0].path !== prepared.artifactFile) {
@@ -229,7 +287,7 @@ export function applyCodexWorkerOutput({
     const artifactPath = resolveInside(cwd, prepared.artifactFile);
     if (!artifactPath) throw workerError('artifact_path_outside_project');
     fs.writeFileSync(artifactPath, parsed.files[0].content, 'utf-8');
-    return { files: [prepared.artifactFile] };
+    return { files: [prepared.artifactFile], plan };
   }
 
   const componentDir = resolveInside(cwd, prepared.componentDir);
@@ -267,7 +325,37 @@ export function applyCodexWorkerOutput({
   }
   manifest.arrivedVariants = phase === 'first' ? 1 : expectedVariants;
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
-  return { files: [...seen] };
+  return { files: [...seen], plan };
+}
+
+function normalizeVariantPlan(plan, expectedVariants) {
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+    throw workerError('worker_output_plan_invalid');
+  }
+  const identityLock = Array.isArray(plan.identityLock)
+    ? plan.identityLock.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const directions = Array.isArray(plan.directions) ? plan.directions : [];
+  if (identityLock.length < 1 || identityLock.length > 8 || directions.length !== Number(expectedVariants)) {
+    throw workerError('worker_output_plan_invalid');
+  }
+  const normalizedDirections = directions.map((direction) => ({
+    variantId: Number(direction?.variantId),
+    name: String(direction?.name || '').trim(),
+    axis: String(direction?.axis || '').trim(),
+    intent: String(direction?.intent || '').trim(),
+  }));
+  const expectedIds = Array.from({ length: Number(expectedVariants) }, (_, index) => index + 1);
+  const sortedIds = normalizedDirections.map((direction) => direction.variantId).sort((a, b) => a - b);
+  if (normalizedDirections.some((direction) => (
+    !Number.isInteger(direction.variantId)
+    || !direction.name
+    || !direction.axis
+    || !direction.intent
+  )) || sortedIds.some((id, index) => id !== expectedIds[index])) {
+    throw workerError('worker_output_plan_invalid');
+  }
+  return { identityLock, directions: normalizedDirections };
 }
 
 export function prepareCodexWorkerPhase({ id, sourceFile, cwd = process.cwd() }) {
