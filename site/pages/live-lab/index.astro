@@ -406,33 +406,43 @@ const providerColumns = [
       <div class="live-performance-finding live-finding-card--quiet" role="note">
         <strong>Dedicated Codex worker</strong>
         <p>
-          Five real Pick → <code>/bolder</code> → Go runs produced variant 1 in {displayMs(liveCodexWorkerResult.productionBrowser.firstVariantMs)} median and all three in {displayMs(liveCodexWorkerResult.productionBrowser.allVariantsMs)}. Accept returned the page in {displayMs(liveCodexWorkerResult.productionBrowser.acceptToResetMs)}; rotating the canceled producer cut Accept → next first variant from {displayMs(liveCodexWorkerResult.productionBrowser.blockedTailBaselineMs)} to {displayMs(liveCodexWorkerResult.productionBrowser.acceptToNextFirstVariantMs)}. In matched full tasks, warm app-server reached usable output in {displayMs(liveCodexWorkerResult.architectureComparison.warmAppServerFirstUsableMs)} versus {displayMs(liveCodexWorkerResult.architectureComparison.directFirstUsableMs)} direct; both passed 4/4.
+          With the target proven as <code>{liveCodexWorkerResult.productionBrowser.selectedTarget}</code>, variant 1 arrived in {displayMs(liveCodexWorkerResult.productionBrowser.firstVariantMs)}, variant 2 in {displayMs(liveCodexWorkerResult.productionBrowser.secondVariantMs)}, and variant 3 in {displayMs(liveCodexWorkerResult.productionBrowser.allVariantsMs)}. Accepting variant 2 while variant 3 was pending returned the page in {displayMs(liveCodexWorkerResult.productionBrowser.acceptToResetMs)} and dispatched the next Go in {displayMs(liveCodexWorkerResult.productionBrowser.acceptToNextGoDispatchMs)}. In matched full tasks, warm app-server reached usable output in {displayMs(liveCodexWorkerResult.architectureComparison.warmAppServerFirstUsableMs)} versus {displayMs(liveCodexWorkerResult.architectureComparison.directFirstUsableMs)} direct; both passed 4/4.
         </p>
       </div>
       <p class="table-scroll-hint" aria-hidden="true">Scroll horizontally to compare →</p>
       <div class="harness-table-wrap" tabindex="0" aria-label="Scrollable production delivery evidence">
         <table class="harness-table">
           <caption class="sr-only">Production Codex delivery candidates and quality evidence</caption>
-          <thead><tr><th>Candidate</th><th>First review</th><th>Full set</th><th>Rendered gate</th><th>Decision</th></tr></thead>
+          <thead><tr><th>Candidate</th><th>Variant 1</th><th>Variant 2</th><th>Full set</th><th>Rendered gate</th><th>Decision</th></tr></thead>
           <tbody>
             <tr>
-              <td><strong>Progressive</strong><span>{liveCodexWorkerResult.productionBrowser.runs} Sol/medium runs</span></td>
+              <td><strong>Root · 1 → 2 → 3</strong><span>{liveCodexWorkerResult.productionBrowser.runs} Sol/medium run</span></td>
               <td><strong>{displayMs(liveCodexWorkerResult.productionBrowser.firstVariantMs)}</strong><span>p95 {displayMs(liveCodexWorkerResult.productionBrowser.firstVariantP95Ms)}</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.productionBrowser.secondVariantMs)}</strong><span>independently acceptable</span></td>
               <td><strong>{displayMs(liveCodexWorkerResult.productionBrowser.allVariantsMs)}</strong><span>p95 {displayMs(liveCodexWorkerResult.productionBrowser.allVariantsP95Ms)}</span></td>
               <td><strong>{liveCodexWorkerResult.renderedQuality.passed}/{liveCodexWorkerResult.renderedQuality.variants}</strong><span>production /bolder variants</span></td>
-              <td><span class="ks-tag" data-tone="ready">Default · quality work next</span></td>
+              <td><span class="ks-tag" data-tone="ready">Default · replicate quality</span></td>
             </tr>
             <tr>
-              <td><strong>Atomic</strong><span>{liveCodexWorkerResult.atomicExperiment.runs} Sol/medium run</span></td>
-              <td><strong>{displayMs(liveCodexWorkerResult.atomicExperiment.firstVariantMs)}</strong><span>waits for trio</span></td>
-              <td><strong>{displayMs(liveCodexWorkerResult.atomicExperiment.allVariantsMs)}</strong><span>single turn</span></td>
-              <td><strong>{liveCodexWorkerResult.atomicExperiment.passed}/{liveCodexWorkerResult.atomicExperiment.variants}</strong><span>production /bolder variants</span></td>
-              <td><span class="ks-tag is-neutral" data-tone="measure">Opt-in · replicate</span></td>
+              <td><strong>Root · 1 → 3</strong><span>{liveCodexWorkerResult.twoCheckpointControl.runs} Sol/medium control</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.twoCheckpointControl.firstVariantMs)}</strong><span>full-card task</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.twoCheckpointControl.secondVariantMs)}</strong><span>arrives with variant 3</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.twoCheckpointControl.allVariantsMs)}</strong><span>two turns</span></td>
+              <td><strong>{liveCodexWorkerResult.twoCheckpointControl.passed}/{liveCodexWorkerResult.twoCheckpointControl.variants}</strong><span>production /bolder variants</span></td>
+              <td><span class="ks-tag is-neutral" data-tone="measure">Control · slower review</span></td>
+            </tr>
+            <tr>
+              <td><strong>Heading transport</strong><span>{liveCodexWorkerResult.transportBaseline.runs} Sol/medium runs</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.transportBaseline.firstVariantMs)}</strong><span>p95 {displayMs(liveCodexWorkerResult.transportBaseline.firstVariantP95Ms)}</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.transportBaseline.allVariantsMs)}</strong><span>legacy 1 → 3 path</span></td>
+              <td><strong>{displayMs(liveCodexWorkerResult.transportBaseline.allVariantsMs)}</strong><span>title-only target</span></td>
+              <td><strong>{liveCodexWorkerResult.transportBaseline.calibratedPassed}/{liveCodexWorkerResult.transportBaseline.variants}</strong><span>recalibrated screenshots</span></td>
+              <td><span class="ks-tag is-neutral" data-tone="measure">Transport evidence only</span></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="live-performance-caption">Timing and rendered-quality samples are reported separately. The current blocker is output quality, not worker pickup: server pickup is {displayMs(liveCodexWorkerResult.productionBrowser.serverPickupMs)} median.</p>
+      <p class="live-performance-caption">Root-task samples prove target identity in the posted Generate payload. The earlier five-run heading sample remains useful only for transport latency. Next gates: replicate root-level rendered quality and reduce the {displayMs(liveCodexWorkerResult.productionBrowser.acceptToNextFirstVariantMs)} cold next-result wait; server pickup is already {displayMs(liveCodexWorkerResult.productionBrowser.serverPickupMs)}.</p>
     </section>
 
     <section class="live-performance-section live-experiments-section ks-section" aria-labelledby="experiments-title" data-lab-panel="harness">
@@ -495,6 +505,7 @@ const providerColumns = [
               <header><h2>Dedicated Codex worker</h2></header>
               <dl>
                 <div><dt>First review</dt><dd>{displayMs(liveCodexWorkerResult.productionBrowser.firstVariantMs)}</dd></div>
+                <div><dt>Second review</dt><dd>{displayMs(liveCodexWorkerResult.productionBrowser.secondVariantMs)}</dd></div>
                 <div><dt>All variants</dt><dd>{displayMs(liveCodexWorkerResult.productionBrowser.allVariantsMs)}</dd></div>
                 <div><dt>Accept → page ready</dt><dd>{displayMs(liveCodexWorkerResult.productionBrowser.acceptToResetMs)}</dd></div>
                 <div><dt>Accept → next Go</dt><dd>{displayMs(liveCodexWorkerResult.productionBrowser.acceptToNextGoDispatchMs)}</dd></div>
@@ -502,7 +513,7 @@ const providerColumns = [
                 <div><dt>Worker ready</dt><dd>{displayMs(liveCodexWorkerResult.coldWorkerReadyMs)}</dd></div>
                 <div><dt>Rendered gate</dt><dd>{liveCodexWorkerResult.renderedQuality.passed}/{liveCodexWorkerResult.renderedQuality.variants}</dd></div>
               </dl>
-              <p>Progressive remains the Codex default. Atomic is measured but opt-in; rendered quality is the next gate.</p>
+              <p>Variant 2 is now independently reviewable and acceptable. The next gate is cold post-Accept generation, followed by replicated root-level rendered quality.</p>
             </section>
           </aside>
         </div>
