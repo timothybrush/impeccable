@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import LiveUiGallery from '../../components/LiveUiGallery.astro';
 import benchmarkData from '../../data/live-performance.json';
 import { currentHarnessProbe, harnessPaths, liveExperiments } from '../../data/live-harnesses';
 import { progressiveDeliveryResult } from '../../data/live-progressive-result';
@@ -11,6 +12,7 @@ import { liveCodexWorkerResult } from '../../data/live-codex-worker-result';
 import { liveAnnotatedResult } from '../../data/live-annotated-result';
 import '../../styles/sub-pages.css';
 import '../../styles/live-performance.css';
+import '../../styles/live-lab-workbench.css';
 
 const reports = 'reports' in benchmarkData ? benchmarkData.reports : [benchmarkData];
 const plainReports = reports.filter(report => report.benchmark.scenario === 'plain' && report.benchmark.agent === 'fake');
@@ -73,40 +75,88 @@ const providerColumns = [
 <Base
   title="Live Latency Lab | Impeccable"
   description="Measured latency for Impeccable Live, from Go to the first usable variant."
-  bodyClass="sub-page live-performance-page"
-  mainClass="live-performance-main"
+  bodyClass="sub-page live-performance-page live-lab-page"
+  mainClass="live-performance-main live-lab-main-shell"
   noIndex
   hideHeader
   hideFooter
 >
-  <header class="live-lab-header">
-    <a class="live-lab-brand ks-brand" href="/live" aria-label="Back to Live Mode">
-      <span class="ks-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M5 2.5 L13.5 2.5 L5.5 21.5 L5 21.5 Q2.5 21.5 2.5 19 L2.5 5 Q2.5 2.5 5 2.5 Z"></path>
-          <path d="M16.5 2.5 L19 2.5 Q21.5 2.5 21.5 5 L21.5 19 Q21.5 21.5 19 21.5 L8.5 21.5 Z"></path>
-        </svg>
-      </span>
-      <span class="ks-wordmark">Impeccable</span>
-    </a>
-    <div>
-      <strong>Live Latency Lab</strong>
-      <span>Development benchmark</span>
-    </div>
-  </header>
-  <article
-    class="live-performance"
-    data-live-performance
-    data-protocol-floor={baselineProductFloor}
-    data-overlap-floor={productFloor}
-  >
-    <header class="live-performance-hero ks-section">
-      <p class="live-performance-kicker">Live latency lab · optimization result</p>
-      <h1>Capture left<br /><span>the critical path.</span></h1>
+  <section class="live-lab-workbench" aria-label="Live performance workbench" data-live-lab-workbench>
+    <aside class="live-lab-nav" aria-label="Live lab navigation">
+      <div class="live-lab-nav-head">
+        <a class="live-lab-brand ks-brand" href="/live" aria-label="Back to Live Mode">
+          <span class="ks-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 2.5 L13.5 2.5 L5.5 21.5 L5 21.5 Q2.5 21.5 2.5 19 L2.5 5 Q2.5 2.5 5 2.5 Z"></path>
+              <path d="M16.5 2.5 L19 2.5 Q21.5 2.5 21.5 5 L21.5 19 Q21.5 21.5 19 21.5 L8.5 21.5 Z"></path>
+            </svg>
+          </span>
+          <span class="ks-wordmark">Impeccable</span>
+        </a>
+        <h1>Live Lab</h1>
+        <p>Internal performance, harness, and UI state workbench.</p>
+        <dl class="live-lab-summary-grid" aria-label="Live benchmark summary">
+          <div><dt>Product floor</dt><dd>{displayMs(protocolFloor)}</dd></div>
+          <div><dt>Accept clean</dt><dd>{displayMs(liveProviderResult.cleanupControl.acceptToCleanPickingMs)}</dd></div>
+          <div><dt>Worker wake</dt><dd>{displayMs(liveCodexWorkerResult.timings.wakeToTurnStartedMs)}</dd></div>
+          <div><dt>Provider pass</dt><dd>{liveProviderResult.totals.passingRuns}/{liveProviderResult.totals.runs}</dd></div>
+        </dl>
+      </div>
+      <nav class="live-lab-nav-scroll" aria-label="Workbench views">
+        <div class="live-lab-nav-group">
+          <h2>Views</h2>
+          <div class="live-lab-nav-list">
+            <button type="button" data-lab-view="overview" aria-pressed="true"><span>Overview</span><span>5</span></button>
+            <button type="button" data-lab-view="providers" aria-pressed="false"><span>Providers</span><span>2</span></button>
+            <button type="button" data-lab-view="harness" aria-pressed="false"><span>Harnesses</span><span>3</span></button>
+            <button type="button" data-lab-view="ui" aria-pressed="false"><span>Live UI states</span><span>new</span></button>
+            <button type="button" data-lab-view="all" aria-pressed="false"><span>All evidence</span><span>13</span></button>
+          </div>
+        </div>
+        <div class="live-lab-nav-group">
+          <h2>Actions</h2>
+          <div class="live-lab-action-list">
+            <a href="/live">Open Live docs</a>
+            <a href="/detector">Open Detector Lab</a>
+            <button type="button" data-lab-reset>Reset simulator</button>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="live-lab-workspace">
+      <header class="live-lab-toolbar">
+        <div>
+          <p class="live-lab-panel-label" data-lab-view-kicker>Runtime overview</p>
+          <h2 data-lab-view-title>Critical path and interaction latency</h2>
+          <p data-lab-view-summary>Model-free product overhead, progressive review, initialization, and the latency simulator.</p>
+        </div>
+        <div class="live-lab-toolbar-actions">
+          <span class="live-lab-status"><i aria-hidden="true"></i> benchmarks loaded</span>
+          <a href="/live">Open Live</a>
+        </div>
+      </header>
+
+      <div class="live-lab-workspace-scroll">
+        <div class="live-lab-content-grid">
+          <article
+            class="live-performance live-lab-canvas"
+            data-live-performance
+            data-protocol-floor={baselineProductFloor}
+            data-overlap-floor={productFloor}
+          >
+    <header class="live-performance-hero ks-section" data-lab-panel="overview">
+      <p class="live-performance-kicker">Latest matched run · first usable variant</p>
+      <h1><span>{displayMs(protocolFloor)}</span> product floor</h1>
       <p class="live-performance-lede">
-        The same model-free run fell from {displayMs(baselineFloor)} to {displayMs(protocolFloor)}, a{' '}
-        {(improvement * 100).toFixed(1)}% reduction. Live now starts the generate fetch in {displayMs(browserDispatch)} median.
+        Down {(improvement * 100).toFixed(1)}% from {displayMs(baselineFloor)} on the same fixture. Generate dispatch now starts in {displayMs(browserDispatch)} median.
       </p>
+      <dl class="live-lab-run-stats" aria-label="Latest Live run stages">
+        <div><dt>Browser dispatch</dt><dd>{displayMs(browserDispatch)}</dd></div>
+        <div><dt>Server pickup</dt><dd>{displayMs(serverPickup)}</dd></div>
+        <div><dt>Source scaffold</dt><dd>{displayMs(scaffold)}</dd></div>
+        <div><dt>Write + settle</dt><dd>{displayMs(writeAndRender)}</dd></div>
+      </dl>
       <div class="live-performance-meta" aria-label="Benchmark context">
         <span>{plain.summary.count} warm runs</span>
         <span>{plain.benchmark.fixture}</span>
@@ -115,7 +165,7 @@ const providerColumns = [
       </div>
     </header>
 
-    <section class="live-performance-section ks-section" aria-labelledby="critical-path-title">
+    <section class="live-performance-section ks-section" aria-labelledby="critical-path-title" data-lab-panel="overview">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Click → first usable variant</p>
@@ -172,7 +222,7 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section ks-section" aria-labelledby="progressive-title">
+    <section class="live-performance-section ks-section" aria-labelledby="progressive-title" data-lab-panel="overview">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Progressive delivery · Codex path</p>
@@ -212,7 +262,7 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section ks-section" aria-labelledby="provider-title">
+    <section class="live-performance-section ks-section" aria-labelledby="provider-title" data-lab-panel="providers">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Paid provider matrix · five runs per candidate</p>
@@ -255,7 +305,7 @@ const providerColumns = [
       </p>
     </section>
 
-    <section class="live-performance-section ks-section" aria-labelledby="init-title">
+    <section class="live-performance-section ks-section" aria-labelledby="init-title" data-lab-panel="overview">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Configured cold initialization</p>
@@ -286,7 +336,7 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section ks-section" aria-labelledby="paths-title">
+    <section class="live-performance-section ks-section" aria-labelledby="paths-title" data-lab-panel="providers">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Before / after / control</p>
@@ -321,7 +371,7 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section live-simulator-section ks-section" aria-labelledby="simulator-title">
+    <section class="live-performance-section live-simulator-section ks-section" aria-labelledby="simulator-title" data-lab-panel="overview">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Latency simulator</p>
@@ -347,7 +397,11 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section ks-section" aria-labelledby="harness-title">
+    <section class="live-lab-ui-panel" data-lab-panel="ui" aria-label="Live UI state gallery">
+      <LiveUiGallery />
+    </section>
+
+    <section class="live-performance-section ks-section" aria-labelledby="harness-title" data-lab-panel="harness">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Harness delivery</p>
@@ -384,7 +438,7 @@ const providerColumns = [
       </div>
     </section>
 
-    <section class="live-performance-section live-experiments-section ks-section" aria-labelledby="experiments-title">
+    <section class="live-performance-section live-experiments-section ks-section" aria-labelledby="experiments-title" data-lab-panel="harness">
       <div class="live-performance-section-head">
         <div>
           <p class="live-performance-label">Evidence-ranked decisions</p>
@@ -409,7 +463,7 @@ const providerColumns = [
       </ol>
     </section>
 
-    <section class="live-performance-method ks-section" aria-labelledby="method-title">
+    <section class="live-performance-method ks-section" aria-labelledby="method-title" data-lab-panel="harness">
       <h2 id="method-title">Measurement contract</h2>
       <p>
         <code>bun run bench:live</code> boots a real framework fixture and Chromium, drives Pick → Go → Cycle,
@@ -418,10 +472,45 @@ const providerColumns = [
         The deterministic agent makes Impeccable overhead visible; model-backed runs remain opt-in because they send fixture context to an external provider.
       </p>
     </section>
-  </article>
+          </article>
+
+          <aside class="live-lab-diagnostics" aria-label="Live lab diagnostics">
+            <section class="live-lab-diagnostic-panel">
+              <header><p class="live-lab-panel-label">Current runtime</p><h2>Interaction floor</h2></header>
+              <dl>
+                <div><dt>Go → first</dt><dd>{displayMs(protocolFloor)}</dd></div>
+                <div><dt>Dispatch</dt><dd>{displayMs(browserDispatch)}</dd></div>
+                <div><dt>Scaffold</dt><dd>{displayMs(scaffold)}</dd></div>
+                <div><dt>Accept → Pick</dt><dd>{displayMs(liveControlResult.acceptToPicking.medianMs)}</dd></div>
+              </dl>
+            </section>
+            <section class="live-lab-diagnostic-panel">
+              <header><p class="live-lab-panel-label">Strategy</p><h2>Measured defaults</h2></header>
+              <ul class="live-lab-strategy-list">
+                <li><strong>Codex / OpenAI</strong><span>progressive compact</span></li>
+                <li><strong>Anthropic</strong><span>progressive compact</span></li>
+                <li><strong>Gemini</strong><span>parallel compact</span></li>
+                <li><strong>Unmeasured harness</strong><span>atomic fallback</span></li>
+              </ul>
+            </section>
+            <section class="live-lab-diagnostic-panel">
+              <header><p class="live-lab-panel-label">Worker path</p><h2>Dedicated Codex turn</h2></header>
+              <dl>
+                <div><dt>Wake</dt><dd>{displayMs(liveCodexWorkerResult.timings.wakeToTurnStartedMs)}</dd></div>
+                <div><dt>Cold setup</dt><dd>{displayMs(liveCodexWorkerResult.timings.coldHandshakeMs + liveCodexWorkerResult.timings.coldThreadStartMs)}</dd></div>
+              </dl>
+              <p>Separate Live-owned thread; never a competing resume of the desktop task.</p>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <script>
     import { initLivePerformance } from '../../scripts/live-performance.js';
+    import { initLiveLabWorkbench } from '../../scripts/live-lab-workbench.js';
     initLivePerformance();
+    initLiveLabWorkbench();
   </script>
 </Base>

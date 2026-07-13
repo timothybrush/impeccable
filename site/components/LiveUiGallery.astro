@@ -1,0 +1,147 @@
+---
+import '../styles/live-ui-gallery.css';
+import { LIVE_COMMANDS } from '../../skill/scripts/live/vocabulary.mjs';
+
+const STATE_GROUPS = [
+  {
+    label: 'Global chrome',
+    states: [
+      ['global-ready', 'Ready'],
+      ['global-disconnected', 'Agent disconnected'],
+      ['global-tools', 'Detect + DESIGN.md'],
+      ['steer-expanded', 'Steer composing'],
+      ['steer-processing', 'Steer processing'],
+    ],
+  },
+  {
+    label: 'Selection',
+    states: [
+      ['configure-replace', 'Configure selection'],
+      ['action-picker', 'Action picker'],
+      ['configure-listening', 'Voice input'],
+      ['configure-locked', 'Apply locked'],
+      ['annotation', 'Annotations'],
+      ['insert-placeholder', 'Insert placeholder'],
+    ],
+  },
+  {
+    label: 'Generation + review',
+    states: [
+      ['generating', 'Generating'],
+      ['generation-recovery', 'Recovery'],
+      ['cycling-progressive', 'Variant 1 arrived'],
+      ['cycling-second', 'Variant 2 arrived'],
+      ['tune-open', 'Tune panel'],
+      ['applying', 'Applying variant'],
+      ['confirmed', 'Variant applied'],
+    ],
+  },
+  {
+    label: 'Copy + support',
+    states: [
+      ['edit-copy', 'Edit copy'],
+      ['copy-pending', 'Copy edits pending'],
+      ['copy-applying', 'Copy edits applying'],
+      ['copy-attention', 'Apply needs attention'],
+      ['design-panel', 'DESIGN.md panel'],
+      ['toast-error', 'Error toast'],
+    ],
+  },
+];
+
+const statePayload = STATE_GROUPS.flatMap((group) =>
+  group.states.map(([key, label]) => ({ key, label, group: group.label })),
+);
+const commandPayload = JSON.stringify(LIVE_COMMANDS).replace(/</g, '\\u003c');
+const statesJson = JSON.stringify(statePayload).replace(/</g, '\\u003c');
+---
+
+<!--
+  Dev-only, embeddable state harness for Impeccable Live. The chrome mirrors:
+  - skill/scripts/live-browser.js (standalone browser UI and exact wording)
+  - skill/scripts/live/ui-core.mjs (surface/state inventory)
+  - skill/scripts/live/vocabulary.mjs (canonical command labels and SVGs)
+
+  Production Live deliberately uses the same dark Neo Kinpaku chrome on light
+  and dark host pages (barPaletteForTheme, live-browser.js). The two columns
+  below therefore vary the host canvas, not the chrome palette.
+-->
+<section class="live-ui-gallery" data-live-ui-gallery data-dev-only="true" aria-labelledby="live-ui-gallery-title">
+  <header class="live-ui-gallery__header">
+    <div class="live-ui-gallery__intro">
+      <p class="live-ui-gallery__eyebrow">Dev-only · Live chrome</p>
+      <h2 id="live-ui-gallery-title">Live UI state gallery</h2>
+      <p>
+        Inspect the real picker, progressive review, copy-apply, and recovery states without starting Live.
+        Every state renders against both host themes.
+      </p>
+    </div>
+
+    <div class="live-ui-gallery__control-panel" aria-label="Gallery controls">
+      <label for="live-ui-gallery-state">State</label>
+      <div class="live-ui-gallery__select-row">
+        <button type="button" class="live-ui-gallery__step" data-gallery-step="-1" aria-label="Previous state">←</button>
+        <select id="live-ui-gallery-state" data-gallery-state>
+          {STATE_GROUPS.map((group) => (
+            <optgroup label={group.label}>
+              {group.states.map(([key, label]) => <option value={key}>{label}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" class="live-ui-gallery__step" data-gallery-step="1" aria-label="Next state">→</button>
+      </div>
+      <p class="live-ui-gallery__shortcut">Use ←/→ while this panel is focused to step through states.</p>
+    </div>
+  </header>
+
+  <nav class="live-ui-gallery__quick-nav" aria-label="Quick state selection">
+    {STATE_GROUPS.map((group) => (
+      <div class="live-ui-gallery__quick-group">
+        <span>{group.label}</span>
+        <div>
+          {group.states.map(([key, label]) => (
+            <button type="button" data-gallery-state-button={key}>{label}</button>
+          ))}
+        </div>
+      </div>
+    ))}
+  </nav>
+
+  <div class="live-ui-gallery__state-readout" aria-live="polite" aria-atomic="true">
+    <span data-gallery-state-group>Global chrome</span>
+    <strong data-gallery-state-label>Ready</strong>
+  </div>
+
+  <div class="live-ui-gallery__previews">
+    <section class="live-ui-gallery__preview" aria-labelledby="live-ui-gallery-light-title">
+      <header>
+        <span class="live-ui-gallery__theme-dot" aria-hidden="true"></span>
+        <h3 id="live-ui-gallery-light-title">Light host</h3>
+        <code>host: light</code>
+      </header>
+      <div class="live-ui-stage is-light" data-live-gallery-preview="light"></div>
+    </section>
+
+    <section class="live-ui-gallery__preview" aria-labelledby="live-ui-gallery-dark-title">
+      <header>
+        <span class="live-ui-gallery__theme-dot" aria-hidden="true"></span>
+        <h3 id="live-ui-gallery-dark-title">Dark host</h3>
+        <code>host: dark</code>
+      </header>
+      <div class="live-ui-stage is-dark" data-live-gallery-preview="dark"></div>
+    </section>
+  </div>
+
+  <p class="live-ui-gallery__fidelity-note">
+    Fidelity anchors: <code>live-browser.js</code> configure row, generation row, cycling row, Tune panel,
+    pending-copy dock, global bar, annotation overlay, and DESIGN.md panel. Command icons and order are imported
+    from <code>live/vocabulary.mjs</code>.
+  </p>
+
+  <script is:inline type="application/json" data-live-gallery-states set:html={statesJson}></script>
+  <script is:inline type="application/json" data-live-gallery-vocabulary set:html={commandPayload}></script>
+</section>
+
+<script>
+  import '../scripts/live-ui-gallery.js';
+</script>
