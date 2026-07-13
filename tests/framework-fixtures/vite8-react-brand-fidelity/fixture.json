@@ -20,6 +20,19 @@
       "No gradients, shadows, glow, or invented content",
       "Preserve every word and the ActionLink"
     ],
+    "tokens": {
+      "--color-paper": "#f3efe4",
+      "--color-paper-deep": "#e7dfcf",
+      "--color-ink": "#20251f",
+      "--color-moss": "#526248",
+      "--color-brass": "#9b6b2f",
+      "--font-display": "Georgia, Times New Roman, serif",
+      "--font-body": "Inter, Arial, sans-serif"
+    },
+    "componentRoles": {
+      "ActionLink": "Quiet outlined control; preserve its label, border, radius, and interaction role",
+      "offer-card": "Warm-paper offer surface with dark ink, moss structure, and optional brass rules"
+    },
     "redactSelectors": []
   },
   "wrapCases": [

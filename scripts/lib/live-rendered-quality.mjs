@@ -16,6 +16,7 @@ export function buildRenderedJudgePrompt({ action, brief, safeContext = {}, vari
     'Use integer scores from 1-10. A 7 means clearly shippable and materially improved. Mark criticalFailure for illegible, broken, clipped, off-brand, generic-AI, or task-contradicting output.',
     'Judge every supplied variant independently. Do not reward novelty that violates the existing identity.',
     'Treat the remote-safe constraints as authoritative. Never call a color, typeface, component, or primitive off-system when the constraints explicitly allow it, even if its rendered hue has another everyday name.',
+    'A palette allowlist permits those colors in any visually sound role unless the constraints explicitly restrict a role. Do not infer dark-ink-only typography, no filled surfaces, or no brass rules from a general palette list.',
     'Do not invent prohibitions from adjectives such as restrained, editorial, bold, or quiet. If an allowed primitive is used poorly, score that under renderedQuality or commandFidelity and describe the actual visual problem; do not misreport it as a system violation.',
     'Use the original screenshot as evidence for established roles, but allow the requested action to materially change hierarchy, proportion, composition, and the placement of explicitly allowed colors.',
     '',
@@ -24,6 +25,23 @@ export function buildRenderedJudgePrompt({ action, brief, safeContext = {}, vari
     '<remote_safe_review_context>', JSON.stringify(safeContext), '</remote_safe_review_context>',
     `<variant_ids>${variants.map((variant) => variant.variantId).join(',')}</variant_ids>`,
   ].join('\n');
+}
+
+export function buildRenderedReviewContext({ fixture, fixtureConfig, action, brief } = {}) {
+  const configured = fixtureConfig?.renderedQuality || {};
+  const selectedAction = String(action || configured.action || 'impeccable');
+  return {
+    action: selectedAction,
+    brief: String(brief || configured.brief || `Apply /${selectedAction} to the selected element while preserving its project identity and functional contract.`),
+    captureSelector: String(configured.captureSelector || fixtureConfig?.runtime?.pickSelector || 'body'),
+    safeContext: {
+      fixture: String(fixture || ''),
+      reviewFocus: String(configured.reviewFocus || ''),
+      constraints: Array.isArray(configured.constraints) ? configured.constraints.map(String) : [],
+      tokens: sanitizeReviewObject(configured.tokens),
+      componentRoles: sanitizeReviewObject(configured.componentRoles),
+    },
+  };
 }
 
 export async function judgeRenderedVariants({
@@ -139,4 +157,11 @@ function normalizeUsage(usage) {
 
 function round(value) {
   return Math.round(value * 100) / 100;
+}
+
+function sanitizeReviewObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key, entry]) => key.length <= 80 && (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean'))
+    .map(([key, entry]) => [String(key), entry]));
 }

@@ -35,6 +35,7 @@ import {
 } from './lib/live-benchmark.mjs';
 import { loadBenchmarkEnv } from './lib/live-provider-benchmark.mjs';
 import {
+  buildRenderedReviewContext,
   judgeRenderedVariants,
   summarizeRenderedJudgeRuns,
 } from './lib/live-rendered-quality.mjs';
@@ -120,7 +121,12 @@ try {
   const runs = [];
   const pickSelector = fixture.runtime.pickSelector || 'h1.hero-title';
   const renderedContext = artifactRoot || judgeRendered
-    ? readRenderedContext(fixture, { fixtureName, action: args.action })
+    ? buildRenderedReviewContext({
+        fixture: fixtureName,
+        fixtureConfig: fixture,
+        action: args.action,
+        brief: args.brief,
+      })
     : null;
   for (let iteration = 1; iteration <= iterations; iteration += 1) {
     const runArtifactDir = artifactRoot
@@ -280,24 +286,6 @@ try {
 async function readGenerationSnapshot(tmp, eventId) {
   const file = join(tmp, '.impeccable', 'live', 'sessions', `${eventId}.snapshot.json`);
   try { return JSON.parse(await readFile(file, 'utf-8')); } catch { return {}; }
-}
-
-function readRenderedContext(currentFixtureConfig, { fixtureName: currentFixture, action }) {
-  const configured = currentFixtureConfig.renderedQuality || {};
-  const selectedAction = String(action || 'impeccable');
-  const briefs = {
-    'vite8-react-brand-fidelity:bolder': 'Make the Field Notes offer card materially bolder. Keep it unmistakably Northstar: amplify hierarchy, proportion, and composition inside the existing design system. Preserve every word and the ActionLink component.',
-  };
-  return {
-    action: selectedAction,
-    brief: String(args.brief || configured.brief || briefs[`${currentFixture}:${selectedAction}`] || `Apply /${selectedAction} to the selected element while preserving its project identity and functional contract.`),
-    captureSelector: String(configured.captureSelector || currentFixtureConfig.runtime.pickSelector || 'body'),
-    safeContext: {
-      fixture: currentFixture,
-      reviewFocus: String(configured.reviewFocus || ''),
-      constraints: Array.isArray(configured.constraints) ? configured.constraints.map(String) : [],
-    },
-  };
 }
 
 async function captureRenderedElement(page, { filePath, selector = null, variantId = null }) {
