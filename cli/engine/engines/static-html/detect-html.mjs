@@ -26,8 +26,10 @@ import {
   checkElementQuality,
   checkCreamPalette,
   checkHtmlPatterns,
+  checkNumberedSectionLabelsFromDoc,
   checkPageLayout,
   checkPageQualityFromDoc,
+  checkRepeatedContainerTextFromDoc,
   checkRepeatedSectionKickersFromDoc,
   resolveBackground,
   resolveBorderRadiusPx,
@@ -200,6 +202,12 @@ async function detectHtml(filePath, options = {}) {
       findings.push(finding(f.id, filePath, f.snippet));
     }
     for (const f of runPageCheck('repeated-section-kickers', () => checkRepeatedSectionKickersFromDoc(document, window))) {
+      findings.push(finding(f.id, filePath, f.snippet));
+    }
+    for (const f of runPageCheck('numbered-section-labels', () => checkNumberedSectionLabelsFromDoc(document, window))) {
+      findings.push(finding(f.id, filePath, f.snippet));
+    }
+    for (const f of runPageCheck('repeated-container-text', () => checkRepeatedContainerTextFromDoc(document, window))) {
       findings.push(finding(f.id, filePath, f.snippet));
     }
     for (const f of runPageCheck('layout-rules', () => checkPageLayout(document, window))) {

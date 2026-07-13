@@ -182,6 +182,17 @@ const ANTIPATTERNS = [
     skillGuideline: 'repeated eyebrow or kicker labels as section scaffolding',
   },
   {
+    id: 'numbered-section-labels',
+    category: 'slop',
+    scopes: ['type'],
+    severity: 'advisory',
+    name: 'Tiny numbered section labels',
+    description:
+      'Small numeric index labels riding next to section headings, repeated section after section, are AI editorial scaffolding — a page numbering its own chapters instead of earning structure. Let hierarchy, content, and rhythm carry the sequence.',
+    skillSection: 'Layout & Space',
+    skillGuideline: 'numbered section markers',
+  },
+  {
     id: 'numbered-section-markers',
     category: 'slop',
     scopes: ['layout'],
@@ -362,6 +373,13 @@ const ANTIPATTERNS = [
       'Content renders wider than its container, spilling out or forcing a horizontal scrollbar. Let text wrap, constrain widths, or give the region a deliberate scroll affordance.',
     skillSection: 'Layout & Space',
     skillGuideline: 'content wider than its container',
+  },
+  {
+    id: 'repeated-container-text',
+    category: 'quality',
+    name: 'Same text repeated inside one container',
+    description:
+      'The same literal text rendered three or more times in structurally different spots inside a single card or panel is redundant messaging — usually a status or label wired into every slot of a template. Say it once, in the slot where it matters most.',
   },
   {
     id: 'clipped-overflow-container',

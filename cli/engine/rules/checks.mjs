@@ -126,7 +126,11 @@ function checkColors(opts) {
         // like `text-paper/60` on `bg-ink` sections are the FP pattern.
         const isAlphaFallbackFP = !DETECTOR_IS_BROWSER && !effectiveBg && (textColor.a != null && textColor.a < 1);
         if (!isAlphaFallbackFP) {
-          findings.push({ id: 'low-contrast', snippet: `${ratio.toFixed(1)}:1 (need ${threshold}:1) — text ${colorToHex(textColor)} on ${colorToHex(bgs[worstIdx])}` });
+          // Near-threshold ratios (e.g. 4.497) would round to the threshold
+          // itself at one decimal and read as "4.5 needs 4.5" — show two
+          // decimals there so the finding stays legible.
+          const ratioLabel = ratio.toFixed(1) === threshold.toFixed(1) ? ratio.toFixed(2) : ratio.toFixed(1);
+          findings.push({ id: 'low-contrast', snippet: `${ratioLabel}:1 (need ${threshold}:1) — text ${colorToHex(textColor)} on ${colorToHex(bgs[worstIdx])}` });
         }
       }
     }
@@ -783,8 +787,16 @@ function scanCssTextForPseudoStripe(content) {
     let edge = null;
     let thicknessPx = null;
     if (verticalCandidate) {
+      // Full-height stripes hug both corners; the "floating" variant backs
+      // off each end by a small inset (top/bottom a few px) so the bar
+      // clears the card's corners. Both read as the same side-tab accent —
+      // corner treatment is styling, not a different pattern.
+      const topPx = cssLengthToPx(resolveVarRefs(String(offsets.top ?? ''), customProps));
+      const bottomPx = cssLengthToPx(resolveVarRefs(String(offsets.bottom ?? ''), customProps));
       const fullHeight = (isZeroOffset(offsets.top) && isZeroOffset(offsets.bottom))
-        || /^100(?:\.0*)?%$/.test(heightValue);
+        || /^100(?:\.0*)?%$/.test(heightValue)
+        || (topPx != null && bottomPx != null
+          && topPx >= 0 && topPx <= 20 && bottomPx >= 0 && bottomPx <= 20);
       if (fullHeight) {
         edge = isZeroOffset(offsets.left) ? 'left'
           : isZeroOffset(offsets.right) ? 'right' : null;
@@ -1334,7 +1346,11 @@ function checkHtmlPatterns(html) {
 // `background: #abc`. Real browsers always decompose, so the fallback is
 // a no-op there.
 function readOwnBackgroundColor(el, computedStyle) {
-  const bg = parseRgb(computedStyle.backgroundColor);
+  // Real browsers keep wide-gamut/computed color functions (oklch(), oklab(),
+  // color-mix() results) in getComputedStyle output, which plain parseRgb
+  // misses — a flat oklch button background would silently skip every
+  // contrast check without the parseAnyColor fallback.
+  const bg = parseRgb(computedStyle.backgroundColor) || parseAnyColor(computedStyle.backgroundColor);
   if (DETECTOR_IS_BROWSER || (bg && bg.a >= 0.1)) return bg;
   const rawStyle = el.getAttribute?.('style') || '';
   const bgMatch = rawStyle.match(/background(?:-color)?\s*:\s*([^;]+)/i);
@@ -1529,6 +1545,77 @@ function checkElementBordersDOM(el) {
   });
 }
 
+// Browser-side twin of scanCssTextForPseudoStripe. The text scanner reads
+// stylesheet source, so a stripe whose color only exists at runtime (an
+// inline per-card custom property, a JS-assigned var) or whose geometry
+// resolves in layout never matches it. In a real browser the pseudo-element's
+// computed style carries the actual used color and px geometry — check those
+// directly. Gates mirror the text scanner: 3-12px thick, chromatic fill,
+// spanning (nearly) the full edge; corner rounding on the host card is
+// irrelevant. Exemptions stay narrow: structural/prose tags, real selection
+// markers (isTabContextElement), and button/link affordances for the
+// horizontal variant.
+function checkElementPseudoStripeDOM(el) {
+  const tag = el.tagName.toLowerCase();
+  if (BORDER_SAFE_TAGS.has(tag) || tag === 'summary') return [];
+  if (el.closest?.('nav, blockquote, pre')) return [];
+  if (!isRenderedForBrowserRule(el)) return [];
+  const rect = el.getBoundingClientRect();
+  if (rect.width < 40 || rect.height < 20) return [];
+  if (isTabContextElement(el)) return [];
+
+  const findings = [];
+  for (const which of ['::before', '::after']) {
+    let ps;
+    try { ps = getComputedStyle(el, which); } catch { continue; }
+    if (!ps || ps.content === 'none' || ps.content === '') continue;
+    if (ps.position !== 'absolute' && ps.position !== 'fixed') continue;
+    if ((parseFloat(ps.opacity) || 0) <= 0.01 || ps.display === 'none') continue;
+    const w = parseFloat(ps.width) || 0;
+    const h = parseFloat(ps.height) || 0;
+    if (!(w > 0 && h > 0)) continue;
+
+    // Used values: for absolutely-positioned boxes the browser resolves
+    // both edge offsets after layout, so left/right (and top/bottom) are
+    // real distances, never "auto".
+    const left = parseFloat(ps.left);
+    const right = parseFloat(ps.right);
+    const top = parseFloat(ps.top);
+    const bottom = parseFloat(ps.bottom);
+    const hugs = (v) => Number.isFinite(v) && v >= -2 && v <= 2;
+
+    let edge = null;
+    let thickness = null;
+    // Vertical stripe: narrow box spanning (nearly) the full height of the
+    // host, hugging its left or right edge. "Nearly" tolerates the floating
+    // variant that backs off each end by a small inset.
+    if (w >= 3 && w <= 12 && h >= rect.height - 44 && h >= rect.height * 0.5) {
+      edge = hugs(left) ? 'left' : hugs(right) ? 'right' : null;
+      thickness = w;
+    }
+    // Horizontal stripe riding the top or bottom edge. Button/link-styled
+    // hosts keep their underline affordances.
+    if (!edge && h >= 3 && h <= 12 && w >= rect.width - 44 && w >= rect.width * 0.5) {
+      const cls = String(el.getAttribute?.('class') || el.className || '');
+      if (!/(?:^|[\s_-])(?:btn|button|link)(?:$|[\s\w_-])/i.test(cls)) {
+        edge = hugs(top) ? 'top' : hugs(bottom) ? 'bottom' : null;
+        thickness = h;
+      }
+    }
+    if (!edge) continue;
+
+    const bg = parseRgb(ps.backgroundColor) || parseAnyColor(ps.backgroundColor);
+    if (!bg || (bg.a ?? 1) < 0.1) continue;
+    if (Math.max(bg.r, bg.g, bg.b) - Math.min(bg.r, bg.g, bg.b) < 30) continue;
+
+    findings.push({
+      id: 'side-tab',
+      snippet: `${classSelector(el)}${which} — absolute ${thickness}px pseudo-element stripe (${edge})`,
+    });
+  }
+  return findings;
+}
+
 function checkElementColorsDOM(el) {
   const tag = el.tagName.toLowerCase();
   // No early SAFE_TAGS bail here — checkColors() does its own gating that
@@ -1542,7 +1629,12 @@ function checkElementColorsDOM(el) {
   const effectiveBg = resolveBackground(el);
   return checkColors({
     tag,
-    textColor: parseRgb(style.color),
+    // Chrome serializes computed colors specified in modern spaces as
+    // oklch()/oklab() strings; without the parseAnyColor fallback the text
+    // color comes back null and the low-contrast / gray-on-color checks
+    // silently never run (the shipped miss: a nav CTA whose text color was
+    // an oklch token near its own oklch background).
+    textColor: parseRgb(style.color) || parseAnyColor(style.color),
     bgColor: readOwnBackgroundColor(el, style),
     effectiveBg,
     effectiveBgStops: effectiveBg ? null : resolveGradientStops(el),
@@ -2097,6 +2189,143 @@ function checkRepeatedSectionKickersDOM() {
     (value, fontSize) => resolveLengthPx(value, fontSize) || 0,
   );
   return checkRepeatedSectionKickers({ candidates });
+}
+
+// ── Numbered section labels ─────────────────────────────────────────────────
+// Sibling of the repeated-kicker rule: instead of a tracked uppercase word,
+// the section scaffold is a tiny numeric index riding beside each section
+// heading — bare and zero-padded, or an index joined to a short micro-label
+// by a separator glyph. The kicker rule deliberately excludes bare 1-2 digit
+// labels; this rule owns that shape.
+
+const NUMBERED_LABEL_TAGS = new Set(['span', 'p', 'div', 'small', 'em', 'strong', 'b']);
+
+// Returns { index, text } when the trimmed text reads as a section index
+// label, else null. Two accepted shapes: a zero-padded/two-digit bare index,
+// or a 1-2 digit index followed by a non-word separator and a short label.
+function parseNumberedLabelText(rawText) {
+  const text = (rawText || '').replace(/\s+/g, ' ').trim();
+  if (!text || text.length > 40) return null;
+  let m = /^(\d{2})$/.exec(text);
+  if (!m) m = /^(\d{1,2})\s*[^\w\s]\s*\S/.exec(text);
+  if (!m) return null;
+  const index = parseInt(m[1], 10);
+  if (!Number.isFinite(index) || index > 40) return null;
+  return { index, text };
+}
+
+function isNumberedSectionLabelCandidate(opts) {
+  const {
+    headingTag, headingText, headingFontSize,
+    labelTag, labelIndex, labelText,
+    labelFontSize, labelLetterSpacing, labelFontWeight,
+    labelFontFamily, labelTextTransform, labelColor,
+  } = opts;
+  if (!['h2', 'h3', 'h4'].includes(headingTag)) return false;
+  if (!headingText || headingText.length < 3) return false;
+  if (!labelTag || !NUMBERED_LABEL_TAGS.has(labelTag)) return false;
+  if (labelIndex == null || !labelText) return false;
+  // Tiny rendered size is the tell — a display-scale section number is a
+  // different (deliberate) device and stays legal.
+  if (!(labelFontSize > 0 && labelFontSize <= 13)) return false;
+  // The heading must be visibly larger where we can resolve its size.
+  // clamp()/var() sizes come back unparseable (0) in the static engine —
+  // the remaining gates carry the check there.
+  if (headingFontSize > 0 && headingFontSize < labelFontSize * 1.3) return false;
+  // Deliberate micro-label styling separates the scaffold from incidental
+  // small text: mono face, bold weight, tracking, uppercase, or accent color.
+  const weight = Number(labelFontWeight) || 400;
+  return /mono/i.test(labelFontFamily || '')
+    || weight >= 600
+    || (labelLetterSpacing || 0) >= 0.5
+    || (labelTextTransform || '') === 'uppercase'
+    || isAccentColor(labelColor || '');
+}
+
+function collectNumberedSectionLabelCandidates(doc, getStyle, resolveLetterSpacing) {
+  const candidates = [];
+  const seenLabels = new Set();
+  for (const heading of doc.querySelectorAll('h2, h3, h4')) {
+    if (heading.closest?.(REPEATED_KICKER_SKIP_SELECTOR)) continue;
+    // The index sits either directly before the heading, or before the
+    // wrapper the heading leads (label | <div><h2>…</h2>…</div>).
+    let label = heading.previousElementSibling;
+    if (!label) {
+      const parent = heading.parentElement;
+      const firstChild = parent?.children?.[0];
+      if (firstChild === heading) label = parent.previousElementSibling;
+    }
+    if (!label || seenLabels.has(label)) continue;
+    if (label.closest?.(REPEATED_KICKER_SKIP_SELECTOR)) continue;
+    if (HEADING_TAGS.has(label.tagName.toLowerCase())) continue;
+    if (isRepeatedKickerCardContext(heading, label)) continue;
+
+    const labelText = cleanInlineText(label) || (label.textContent || '').replace(/\s+/g, ' ').trim();
+    const parsed = parseNumberedLabelText(labelText);
+    if (!parsed) continue;
+
+    const headingStyle = getStyle(heading);
+    const labelStyle = getStyle(label);
+    const headingText = (heading.textContent || '').replace(/\s+/g, ' ').trim();
+    const headingFontSize = resolveLetterSpacing(headingStyle.fontSize || '', 16) || parseFloat(headingStyle.fontSize) || 0;
+    const labelFontSize = resolveLetterSpacing(labelStyle.fontSize || '', 16) || parseFloat(labelStyle.fontSize) || 0;
+
+    if (!isNumberedSectionLabelCandidate({
+      headingTag: heading.tagName.toLowerCase(),
+      headingText,
+      headingFontSize,
+      labelTag: label.tagName.toLowerCase(),
+      labelIndex: parsed.index,
+      labelText: parsed.text,
+      labelFontSize,
+      labelLetterSpacing: resolveLetterSpacing(labelStyle.letterSpacing || '', labelFontSize),
+      labelFontWeight: labelStyle.fontWeight || '',
+      labelFontFamily: labelStyle.fontFamily || '',
+      labelTextTransform: labelStyle.textTransform || '',
+      labelColor: labelStyle.color || '',
+    })) {
+      continue;
+    }
+
+    seenLabels.add(label);
+    candidates.push({
+      index: parsed.index,
+      labelText: parsed.text.slice(0, 24),
+      headingTag: heading.tagName.toLowerCase(),
+      headingText: headingText.replace(/^"|"$/g, '').slice(0, 60),
+    });
+  }
+  return candidates;
+}
+
+function checkNumberedSectionLabels(opts) {
+  const { candidates, minCount = 2 } = opts;
+  if (!Array.isArray(candidates) || candidates.length < minCount) return [];
+  // A repeated identical number is some other device; the scaffold counts up.
+  const distinctIndices = new Set(candidates.map(c => c.index));
+  if (distinctIndices.size < 2) return [];
+  return candidates.map(candidate => ({
+    id: 'numbered-section-labels',
+    snippet: `tiny numbered label "${candidate.labelText}" beside ${candidate.headingTag} "${candidate.headingText}" (${candidates.length} on page)`,
+  }));
+}
+
+function checkNumberedSectionLabelsFromDoc(doc, win) {
+  const candidates = collectNumberedSectionLabelCandidates(
+    doc,
+    (el) => win.getComputedStyle(el),
+    (value, fontSize) => resolveLengthPx(value, fontSize) || 0,
+  );
+  return checkNumberedSectionLabels({ candidates });
+}
+
+function checkNumberedSectionLabelsDOM() {
+  const candidates = collectNumberedSectionLabelCandidates(
+    document,
+    (el) => getComputedStyle(el),
+    (value, fontSize) => resolveLengthPx(value, fontSize) || 0,
+  );
+  return checkNumberedSectionLabels({ candidates });
 }
 
 function checkElementMotionDOM(el) {
@@ -3193,6 +3422,135 @@ function checkPageLayout(doc, win) {
   return findings;
 }
 
+// ── Repeated text inside one container ──────────────────────────────────────
+// The same literal string rendered 3+ times in structurally different spots
+// inside one bordered/elevated container — typically a status word wired
+// into every slot of a card template. Legitimate repetition is structural:
+// table columns, calendar grids, nav/menu lists, and templated sibling rows
+// all repeat text in *parallel* positions, so occurrences whose element
+// paths inside the container are identical (or live in dedicated repetition
+// structures) never count. Only 3+ occurrences at 3+ distinct structural
+// positions flag.
+
+const REPEATED_TEXT_SKIP_SELECTOR = [
+  'table',
+  'select',
+  'datalist',
+  'nav',
+  'menu',
+  '[role="navigation"]',
+  '[role="menu"]',
+  '[role="menubar"]',
+  '[role="listbox"]',
+  '[role="grid"]',
+  '[role="tablist"]',
+  '[role="radiogroup"]',
+  '[aria-hidden="true"]',
+].join(',');
+
+const REPEATED_TEXT_CONTAINER_TAGS = new Set([
+  'div', 'section', 'article', 'aside', 'main', 'figure', 'form', 'fieldset', 'details', 'li',
+]);
+
+// A container worth attributing text to: visibly bounded (border on most
+// sides or an elevation shadow) and surface-like (radius or own background).
+function isRepeatedTextContainer(style) {
+  if (!style) return false;
+  const hasShadow = !!(style.boxShadow && style.boxShadow !== 'none' && style.boxShadow !== '');
+  const borderSides = ['Top', 'Right', 'Bottom', 'Left']
+    .filter(side => (parseFloat(style[`border${side}Width`]) || 0) >= 1).length;
+  const hasBorder = borderSides >= 3;
+  const hasRadius = (parseFloat(style.borderRadius) || 0) > 0;
+  const bg = parseRgb(style.backgroundColor) || parseAnyColor(style.backgroundColor);
+  const hasBg = !!(bg && (bg.a ?? 1) > 0.1);
+  return isCardLikeFromProps(hasShadow, hasBorder, hasRadius, hasBg);
+}
+
+function collectRepeatedContainerTextFindings(doc, getStyle, opts = {}) {
+  const isVisible = opts.isVisible || (() => true);
+  const findings = [];
+
+  const containers = [];
+  const containerSet = new Set();
+  for (const el of doc.querySelectorAll('*')) {
+    if (!REPEATED_TEXT_CONTAINER_TAGS.has(el.tagName.toLowerCase())) continue;
+    if (el.closest?.(REPEATED_TEXT_SKIP_SELECTOR)) continue;
+    if (!isRepeatedTextContainer(getStyle(el))) continue;
+    containers.push(el);
+    containerSet.add(el);
+  }
+
+  for (const container of containers) {
+    if (!isVisible(container)) continue;
+    const descendants = container.querySelectorAll('*');
+    // Page-scale wrappers that merely happen to carry a background are not
+    // the "one card" this rule reasons about.
+    if (descendants.length > 250) continue;
+
+    const groups = new Map();
+    for (const d of descendants) {
+      // Attribute text to the innermost container only.
+      let anc = d.parentElement;
+      let ownedByInner = false;
+      while (anc && anc !== container) {
+        if (containerSet.has(anc)) { ownedByInner = true; break; }
+        anc = anc.parentElement;
+      }
+      if (ownedByInner) continue;
+      if (d.closest?.(REPEATED_TEXT_SKIP_SELECTOR)) continue;
+      // Icon-font glyph names read as text but render as symbols.
+      if (/icon|material-symbols|(?:^|\s)fa[srlbd]?(?:\s|-|$)/i.test(String(d.getAttribute?.('class') || ''))) continue;
+      if (!isVisible(d)) continue;
+
+      const direct = [...d.childNodes]
+        .filter(n => n.nodeType === 3)
+        .map(n => n.textContent)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (direct.length < 4 || direct.length > 48) continue;
+      if (!/[a-zA-Z]/.test(direct)) continue;
+
+      // Structural signature: the element path from the occurrence up to
+      // the container. Parallel/templated repetition shares one signature.
+      const sig = [];
+      for (let cur = d; cur && cur !== container; cur = cur.parentElement) {
+        const cls = String(cur.getAttribute?.('class') || '')
+          .trim().split(/\s+/).filter(Boolean).sort().join('.');
+        sig.push(cur.tagName.toLowerCase() + (cls ? `.${cls}` : ''));
+      }
+      if (!groups.has(direct)) groups.set(direct, []);
+      groups.get(direct).push(sig.join('>'));
+    }
+
+    for (const [text, sigs] of groups) {
+      if (sigs.length < 3) continue;
+      if (new Set(sigs).size < 3) continue;
+      findings.push({
+        id: 'repeated-container-text',
+        snippet: `"${text.slice(0, 40)}" rendered ${sigs.length}× in distinct spots inside ${classSelector(container)}`,
+      });
+    }
+  }
+  return findings;
+}
+
+function checkRepeatedContainerTextFromDoc(doc, win) {
+  return collectRepeatedContainerTextFindings(
+    doc,
+    (el) => win.getComputedStyle(el),
+    { isVisible: (el) => String(win.getComputedStyle(el).display || '') !== 'none' },
+  );
+}
+
+function checkRepeatedContainerTextDOM() {
+  return collectRepeatedContainerTextFindings(
+    document,
+    (el) => getComputedStyle(el),
+    { isVisible: isRenderedForBrowserRule },
+  );
+}
+
 // ─── Cream / beige palette (the default "tasteful" AI surface) ────────────────
 // A warm, lightly-tinted off-white page background — light, with R≥G≥B and a
 // small warm tint (not white, not a strong color). The current reflex surface.
@@ -3680,6 +4038,17 @@ export {
   isRepeatedKickerCandidate,
   collectRepeatedSectionKickerCandidates,
   checkRepeatedSectionKickersDOM,
+  parseNumberedLabelText,
+  isNumberedSectionLabelCandidate,
+  collectNumberedSectionLabelCandidates,
+  checkNumberedSectionLabels,
+  checkNumberedSectionLabelsFromDoc,
+  checkNumberedSectionLabelsDOM,
+  isRepeatedTextContainer,
+  collectRepeatedContainerTextFindings,
+  checkRepeatedContainerTextFromDoc,
+  checkRepeatedContainerTextDOM,
+  checkElementPseudoStripeDOM,
   checkElementMotionDOM,
   checkElementGlowDOM,
   checkElementAIPaletteDOM,

@@ -12,9 +12,12 @@ import {
 } from '../cli/engine/detect-antipatterns.mjs';
 import { filterByScopes } from '../cli/engine/registry/antipatterns.mjs';
 import {
+  checkColors,
   checkElementTextOverflowDOM,
   checkHeroEyebrow,
   checkHoverContrast,
+  checkNumberedSectionLabels,
+  parseNumberedLabelText,
   checkHtmlPatterns,
   checkPageTypography,
   isScreenReaderOnlyTextStyle,
@@ -1022,6 +1025,22 @@ describe('side-tab — pseudo-element stripe variant', () => {
     expect(scanCssTextForPseudoStripe(css)).toHaveLength(1);
   });
 
+  test('detects floating stripe inset a few px from each end', () => {
+    // The evasion shape from human review: same left-edge accent bar, but
+    // backed off the card's corners by a small top/bottom inset so it never
+    // touches an edge (and needs no corner rounding to read as a side tab).
+    const css = '.row::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: oklch(0.65 0.19 15); }';
+    const f = scanCssTextForPseudoStripe(css);
+    expect(f).toHaveLength(1);
+    expect(f[0].id).toBe('side-tab');
+    expect(f[0].snippet).toContain('(left: 0)');
+  });
+
+  test('skips deeply-inset partial rail (not an edge-spanning stripe)', () => {
+    const css = '.rail::before { position: absolute; left: 0; top: 40px; bottom: 40px; width: 4px; background: #3b82f6; }';
+    expect(scanCssTextForPseudoStripe(css)).toHaveLength(0);
+  });
+
   test('unresolvable custom-property color errs toward detection', () => {
     const css = '.card::before { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--from-external-sheet); }';
     expect(scanCssTextForPseudoStripe(css)).toHaveLength(1);
@@ -1103,6 +1122,63 @@ describe('side-tab — pseudo-element stripe variant', () => {
     const band = '.card::before { position: absolute; top: 0; left: 0; right: 0; height: 16px; background: #e04a3a; }';
     expect(scanCssTextForPseudoStripe(thin)).toHaveLength(0);
     expect(scanCssTextForPseudoStripe(band)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Low contrast — modern computed-color serializations (browser adapter path)
+// ---------------------------------------------------------------------------
+
+describe('checkColors — oklch computed colors', () => {
+  test('flat dark-on-dark oklch CTA pair parses and fails contrast', () => {
+    // Real browsers hand back oklch() strings from getComputedStyle for
+    // colors authored in modern spaces; the adapters must not lose them.
+    const textColor = parseAnyColor('oklch(0.34 0.01 70)');
+    const bgColor = parseAnyColor('oklch(0.22 0.01 70)');
+    expect(textColor).toBeTruthy();
+    expect(bgColor).toBeTruthy();
+    const f = checkColors({
+      tag: 'a',
+      textColor,
+      bgColor,
+      effectiveBg: bgColor,
+      effectiveBgStops: null,
+      fontSize: 14.4,
+      fontWeight: 500,
+      hasDirectText: true,
+      isEmojiOnly: false,
+      bgClip: '',
+      bgImage: '',
+      classList: 'btn btn-primary',
+    });
+    expect(f.some(r => r.id === 'low-contrast')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Numbered section labels — pure helpers
+// ---------------------------------------------------------------------------
+
+describe('numbered-section-labels — pure helpers', () => {
+  test('parseNumberedLabelText accepts zero-padded and separator forms only', () => {
+    expect(parseNumberedLabelText('01')).toEqual({ index: 1, text: '01' });
+    expect(parseNumberedLabelText('12')).toEqual({ index: 12, text: '12' });
+    expect(parseNumberedLabelText('04 / rollout')).toMatchObject({ index: 4 });
+    expect(parseNumberedLabelText('6 · getting started')).toMatchObject({ index: 6 });
+    expect(parseNumberedLabelText('7')).toBeNull();
+    expect(parseNumberedLabelText('Step 3')).toBeNull();
+    expect(parseNumberedLabelText('12 minute read')).toBeNull();
+    expect(parseNumberedLabelText('50% off everything')).toBeNull();
+    expect(parseNumberedLabelText('')).toBeNull();
+  });
+
+  test('checkNumberedSectionLabels needs 2+ candidates with 2+ distinct indices', () => {
+    const candidate = (index) => ({ index, labelText: String(index).padStart(2, '0'), headingTag: 'h2', headingText: 'Heading' });
+    expect(checkNumberedSectionLabels({ candidates: [candidate(1)] })).toHaveLength(0);
+    expect(checkNumberedSectionLabels({ candidates: [candidate(1), candidate(1)] })).toHaveLength(0);
+    const flagged = checkNumberedSectionLabels({ candidates: [candidate(1), candidate(2)] });
+    expect(flagged).toHaveLength(2);
+    expect(flagged[0].id).toBe('numbered-section-labels');
   });
 });
 

@@ -1477,6 +1477,7 @@ if (IS_BROWSER) {
 
       const findings = [
         ...checkElementBordersDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
+        ...checkElementPseudoStripeDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementColorsDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementMotionDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
         ...checkElementGlowDOM(el).map(f => ({ type: f.id, detail: f.snippet })),
@@ -1524,6 +1525,22 @@ if (IS_BROWSER) {
     if (sectionKickerFindings.length > 0) {
       pageLevelFindings.push(...sectionKickerFindings);
       addBrowserFindings(groupMap, document.body, sectionKickerFindings);
+    }
+
+    const numberedLabelFindings = checkNumberedSectionLabelsDOM()
+      .map(f => ({ type: f.id, detail: f.snippet }))
+      .filter(f => _ruleOk(f.type));
+    if (numberedLabelFindings.length > 0) {
+      pageLevelFindings.push(...numberedLabelFindings);
+      addBrowserFindings(groupMap, document.body, numberedLabelFindings);
+    }
+
+    const repeatedTextFindings = checkRepeatedContainerTextDOM()
+      .map(f => ({ type: f.id, detail: f.snippet }))
+      .filter(f => _ruleOk(f.type));
+    if (repeatedTextFindings.length > 0) {
+      pageLevelFindings.push(...repeatedTextFindings);
+      addBrowserFindings(groupMap, document.body, repeatedTextFindings);
     }
 
     const layoutFindings = checkLayout().filter(f => _ruleOk(f.type));

@@ -375,6 +375,39 @@ describe('detectHtml — static HTML/CSS fixtures', () => {
     );
     assert.match(numbered[0].snippet, /01, 02, 03/);
   });
+
+  it('numbered-section-labels: tiny repeated index labels flag, deliberate/list/card numbering passes', async () => {
+    const f = await detectHtml(path.join(FIXTURES, 'numbered-section-labels.html'));
+    const labels = f.filter(r => r.antipattern === 'numbered-section-labels');
+    const snippets = labels.map(r => r.snippet).join(' | ');
+    assert.equal(
+      labels.length,
+      4,
+      `expected 4 numbered-label findings, got ${labels.length}: ${snippets}`
+    );
+    for (const heading of ['Alpha ships first', 'Beta earns trust', 'Gamma holds the line', 'Delta closes the loop']) {
+      assert.match(snippets, new RegExp(heading), `expected label beside "${heading}" to flag`);
+    }
+    for (const heading of ['Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu']) {
+      assert.doesNotMatch(snippets, new RegExp(heading), `label beside "${heading}" should pass`);
+    }
+  });
+
+  it('repeated-container-text: same string in 3+ distinct slots of one card flags; structural repetition passes', async () => {
+    const f = await detectHtml(path.join(FIXTURES, 'repeated-container-text.html'));
+    const repeats = f.filter(r => r.antipattern === 'repeated-container-text');
+    const snippets = repeats.map(r => r.snippet).join(' | ');
+    assert.equal(
+      repeats.length,
+      2,
+      `expected 2 repeated-text findings, got ${repeats.length}: ${snippets}`
+    );
+    assert.match(snippets, /Suspended.*3×|Suspended" rendered 3/, 'expected the 3-slot status word to flag');
+    assert.match(snippets, /Unavailable" rendered 4/, 'expected the 4-slot status word to flag');
+    for (const passText of ['Rolled back', 'On schedule', 'Overview page', 'Standby mode', 'Open slot', 'Rescheduled', '2026']) {
+      assert.doesNotMatch(snippets, new RegExp(passText), `"${passText}" should pass`);
+    }
+  });
 });
 
 describe('detectHtml — icon-tile-stack', () => {
