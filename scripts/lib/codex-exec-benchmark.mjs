@@ -89,6 +89,8 @@ export function summarizeArchitectureRuns(runs) {
   return {
     runs: runs.length,
     passed: completed.filter((run) => run.passed).length,
+    medianFirstUsableMs: percentile(completed.map((run) => run.firstUsableMs).filter(Number.isFinite), 0.5),
+    p95FirstUsableMs: percentile(completed.map((run) => run.firstUsableMs).filter(Number.isFinite), 0.95),
     medianTotalMs: percentile(completed.map((run) => run.totalMs), 0.5),
     p95TotalMs: percentile(completed.map((run) => run.totalMs), 0.95),
     medianStartupMs: percentile(completed.map((run) => run.startupMs).filter(Number.isFinite), 0.5),

@@ -32,12 +32,13 @@ describe('direct Codex architecture benchmark', () => {
 
   it('summarizes startup, generation, total, quality, and token medians', () => {
     const summary = summarizeArchitectureRuns([
-      { passed: true, startupMs: 10, generationMs: 100, totalMs: 110, usage: { input_tokens: 1000, cached_input_tokens: 500, output_tokens: 100 } },
-      { passed: false, startupMs: 20, generationMs: 200, totalMs: 220, usage: { input_tokens: 2000, cached_input_tokens: 1000, output_tokens: 200 } },
+      { passed: true, startupMs: 10, generationMs: 100, firstUsableMs: 110, totalMs: 110, usage: { input_tokens: 1000, cached_input_tokens: 500, output_tokens: 100 } },
+      { passed: false, startupMs: 20, generationMs: 200, firstUsableMs: 220, totalMs: 220, usage: { input_tokens: 2000, cached_input_tokens: 1000, output_tokens: 200 } },
     ]);
     assert.equal(summary.runs, 2);
     assert.equal(summary.passed, 1);
     assert.equal(summary.medianTotalMs, 165);
+    assert.equal(summary.medianFirstUsableMs, 165);
     assert.equal(summary.medianInputTokens, 1500);
   });
 });

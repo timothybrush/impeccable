@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
@@ -34,7 +33,7 @@ const iterations = positiveInteger(args.iterations, 2);
 const timeoutMs = positiveInteger(args.timeout, 300_000);
 const outputPath = args.output ? path.resolve(ROOT, String(args.output)) : null;
 const profileIds = csv(args.profiles || 'direct-sol,cold-app-server,warm-app-server');
-const taskIds = csv(args.tasks || 'editorial-bolder,operations-polish');
+const taskIds = csv(args.tasks || 'editorial-bolder,operations-polish,operations-annotated');
 const judgeEnabled = args.judge !== false;
 const loadedEnv = loadBenchmarkEnv({ repoRoot: ROOT, explicitPath: args.envFile && path.resolve(args.envFile) });
 const skillPath = path.join(ROOT, '.agents', 'skills', 'impeccable', 'SKILL.md');
@@ -79,9 +78,12 @@ if (args.dryRun) {
   process.exit(0);
 }
 
-const scratch = await mkdtemp(path.join(os.tmpdir(), 'impeccable-codex-architecture-'));
+const scratchRoot = path.join(ROOT, '.impeccable', 'live');
+await mkdir(scratchRoot, { recursive: true });
+const scratch = await mkdtemp(path.join(scratchRoot, 'architecture-'));
 const schemaPath = path.join(scratch, 'output-schema.json');
 await writeFile(schemaPath, JSON.stringify(CODEX_QUALITY_OUTPUT_SCHEMA));
+await prepareAnnotationScreenshots();
 const runs = [];
 try {
   for (const profile of profileIds) {
@@ -126,20 +128,25 @@ async function runDirect({ profile, task, iteration }) {
   const prompt = [
     '$impeccable',
     'Use the attached Impeccable skill. This automated benchmark already resolved Setup context below; do not rerun setup or edit files.',
+    '<production_worker_contract>',
+    buildCodexWorkerInstructions(liveSpec),
+    '</production_worker_contract>',
     buildCodexQualityPrompt(task, { actionReference, fullContext: true }),
   ].join('\n\n');
   try {
+    const directArgs = [
+      'exec', '--ephemeral', '--ignore-user-config', '--dangerously-bypass-hook-trust',
+      '-C', ROOT, '-s', 'read-only', '-m', model,
+      '-c', 'model_reasoning_effort="medium"',
+      '--output-schema', schemaPath,
+      '--output-last-message', outputFile,
+    ];
+    if (task.screenshotPath) directArgs.push('-i', task.screenshotPath);
+    directArgs.push('--json', prompt);
     const result = await runCodexExecBenchmark({
       cwd: ROOT,
       timeoutMs,
-      args: [
-        'exec', '--ephemeral', '--ignore-user-config', '--dangerously-bypass-hook-trust',
-        '-C', ROOT, '-s', 'read-only', '-m', model,
-        '-c', 'model_reasoning_effort="medium"',
-        '--output-schema', schemaPath,
-        '--output-last-message', outputFile,
-        '--json', prompt,
-      ],
+      args: directArgs,
     });
     const output = JSON.parse(await readFile(outputFile, 'utf-8'));
     return finishRun({
@@ -151,6 +158,7 @@ async function runDirect({ profile, task, iteration }) {
       generationMs: result.firstAgentMessageMs == null || result.turnStartedMs == null
         ? result.durationMs
         : result.firstAgentMessageMs - result.turnStartedMs,
+      firstUsableMs: result.firstAgentMessageMs ?? result.durationMs,
       totalMs: result.durationMs,
       usage: result.usage,
       transport: {
@@ -181,6 +189,7 @@ async function runColdAppServer({ profile, task, iteration }) {
       output: turn.output,
       startupMs,
       generationMs: turn.durationMs,
+      firstUsableMs: startupMs + turn.durationMs,
       totalMs: performance.now() - startedAt,
       usage: normalizeAppServerUsage(turn.turn),
     });
@@ -214,6 +223,7 @@ async function runWarmProfile(profile) {
             output: turn.output,
             startupMs: iteration === 1 && task === tasks[0] ? coldStartupMs : 0,
             generationMs: turn.durationMs,
+            firstUsableMs: turn.durationMs + (iteration === 1 && task === tasks[0] ? coldStartupMs : 0),
             totalMs: performance.now() - turnStartedAt + (iteration === 1 && task === tasks[0] ? coldStartupMs : 0),
             usage: normalizeAppServerUsage(turn.turn),
             transport: { persistentThread: true, coldStartupMs: round(coldStartupMs) },
@@ -244,6 +254,9 @@ function threadParams(profile) {
 async function runAppServerTurn(client, thread, task) {
   const actionReference = await readFile(path.join(referenceDir, `${task.action}.md`), 'utf-8');
   const prompt = buildCodexQualityPrompt(task, { actionReference, fullContext: true });
+  let output = null;
+  let firstAgentMessageMs = null;
+  const startedAt = performance.now();
   const result = await client.startTurn({
     threadId: thread.id,
     input: buildCodexWorkerTurnInputs({ prompt, skillPath, screenshotPath: task.screenshotPath, cwd: ROOT }),
@@ -254,11 +267,63 @@ async function runAppServerTurn(client, thread, task) {
     approvalPolicy: 'never',
     sandboxPolicy: { type: 'readOnly' },
     outputSchema: CODEX_QUALITY_OUTPUT_SCHEMA,
+    onAgentMessage: (message) => {
+      if (output) return;
+      output = JSON.parse(message);
+      firstAgentMessageMs = performance.now() - startedAt;
+    },
   });
-  return { output: JSON.parse(result.message), durationMs: result.durationMs, turn: result };
+  return {
+    output: output || JSON.parse(result.message),
+    durationMs: firstAgentMessageMs ?? result.firstAgentMessageMs ?? result.durationMs,
+    completionMs: result.durationMs,
+    turn: result,
+  };
 }
 
-async function finishRun({ profile, task, iteration, output, startupMs, generationMs, totalMs, usage, transport = null }) {
+async function prepareAnnotationScreenshots() {
+  const annotated = tasks.filter((task) => task.annotation);
+  if (annotated.length === 0) return;
+  const { chromium } = await import('playwright');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const task of annotated) {
+      const screenshotPath = path.join(scratch, `${task.id}.png`);
+      const page = await browser.newPage({ viewport: { width: 1080, height: 720 }, deviceScaleFactor: 1 });
+      await page.setContent(`<!doctype html><html><head><style>
+        ${task.files['src/styles.css']}
+        body { padding: 1px; }
+        .workspace { position: relative; }
+        .metric--warning { outline: 3px solid #d94343; outline-offset: 5px; }
+        .benchmark-annotation {
+          position: absolute; z-index: 10; top: 12.5rem; left: 48%; width: 18rem;
+          padding: 0.7rem 0.85rem; border: 2px solid #d94343; border-radius: 0.25rem;
+          background: #fff8ef; color: #6b1919; font: 700 0.8rem/1.35 Inter, sans-serif;
+          transform: rotate(-1.5deg);
+        }
+        .benchmark-annotation::after {
+          position: absolute; top: 100%; left: 2rem; width: 7rem; height: 3rem;
+          border-left: 3px solid #d94343; border-bottom: 3px solid #d94343;
+          content: ""; transform: skewX(-28deg);
+        }
+      </style></head><body>
+        <main class="workspace">
+          <header class="workspace__header"><div><p class="eyebrow">Monday, 14 July</p><h1>Fulfillment overview</h1><p class="summary">Monitor the work that can put today’s dispatch at risk.</p></div><button class="button button--primary">Create dispatch</button></header>
+          <section class="metrics"><article class="metric metric--positive"><p class="metric__label">Ready</p><strong class="metric__value">184</strong><p class="metric__detail">31 due before noon</p></article><article class="metric metric--warning"><p class="metric__label">At risk</p><strong class="metric__value">12</strong><p class="metric__detail">4 need assignment</p></article><article class="metric metric--critical"><p class="metric__label">Blocked</p><strong class="metric__value">3</strong><p class="metric__detail">Oldest waiting 42 min</p></article></section>
+          <section class="queue"><div class="queue__heading"><div><p class="eyebrow">Priority queue</p><h2>Needs attention</h2></div><button class="button button--quiet">View all 19</button></div><table><thead><tr><th>Dispatch</th><th>Destination</th><th>Owner</th><th>Status</th><th>Due</th></tr></thead><tbody><tr><td>DP-2048</td><td>Portland</td><td>Unassigned</td><td><span class="status status--critical">Blocked</span></td><td>09:30</td></tr><tr><td>DP-2051</td><td>Oakland</td><td>M. Chen</td><td><span class="status status--warning">At risk</span></td><td>10:15</td></tr></tbody></table></section>
+          <div class="benchmark-annotation">${escapeHtml(task.annotation.comment)}</div>
+        </main>
+      </body></html>`, { waitUntil: 'load' });
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      await page.close();
+      task.screenshotPath = screenshotPath;
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+async function finishRun({ profile, task, iteration, output, startupMs, generationMs, firstUsableMs, totalMs, usage, transport = null }) {
   const deterministic = scoreCodexQualityOutput(task, output);
   const judge = judgeEnabled ? await judgeOutput(task, output) : null;
   return {
@@ -269,6 +334,7 @@ async function finishRun({ profile, task, iteration, output, startupMs, generati
     effort: 'medium',
     startupMs: round(startupMs),
     generationMs: round(generationMs),
+    firstUsableMs: round(firstUsableMs),
     totalMs: round(totalMs),
     usage,
     transport,
@@ -302,7 +368,7 @@ async function judgeOutput(task, output) {
 }
 
 function normalizeAppServerUsage(turn) {
-  const usage = turn?.completed?.params?.turn?.usage || turn?.turn?.usage || null;
+  const usage = turn?.tokenUsage?.last || turn?.completed?.params?.turn?.usage || turn?.turn?.usage || null;
   if (!usage) return null;
   return {
     input_tokens: usage.inputTokens ?? usage.input_tokens ?? null,
@@ -346,4 +412,10 @@ function positiveInteger(value, fallback) {
 
 function round(value) {
   return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
 }

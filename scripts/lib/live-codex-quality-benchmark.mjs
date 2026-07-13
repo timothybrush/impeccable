@@ -137,7 +137,7 @@ th { background: var(--surface-subtle); color: var(--ink-muted); font-size: 0.75
 
 export function createCodexQualityTasks({ repoRoot }) {
   const fixtureDir = path.join(repoRoot, 'tests', 'framework-fixtures', 'vite8-react-brand-fidelity', 'files', 'src');
-  return [
+  const tasks = [
     {
       id: 'editorial-bolder',
       action: 'bolder',
@@ -168,6 +168,22 @@ export function createCodexQualityTasks({ repoRoot }) {
       judgeFocus: 'Is this a materially more polished, efficient operations surface, with excellent scan hierarchy and interaction detail, without changing its product model or turning it into a decorative dashboard?',
     },
   ];
+  const operations = tasks[1];
+  tasks.push({
+    ...operations,
+    id: 'operations-annotated',
+    brief: 'Polish this fulfillment dashboard while following the attached annotation. Make the At risk state easier to identify in a fast scan without making the whole dashboard louder. Preserve the existing information architecture, components, terminology, and token palette.',
+    annotation: {
+      comment: 'Make this risk state easier to scan without making the whole dashboard louder.',
+      target: 'The At risk metric card and its relationship to the priority queue.',
+      strokes: 1,
+    },
+    allowedForbiddenMatches: [
+      /box-shadow\s*:\s*inset\s+(?:0|0?\.\d+(?:rem|px))\s+0(?:\s+0)?\s+var\(--warning\)\s*;?/gi,
+    ],
+    judgeFocus: 'Does the implementation respond precisely to the visual annotation by strengthening risk-state scanning, while remaining a calm operations UI and preserving the established component and status system?',
+  });
+  return tasks;
 }
 
 export function buildCodexQualityPrompt(task, { actionReference = '', fullContext = false } = {}) {
@@ -182,6 +198,7 @@ export function buildCodexQualityPrompt(task, { actionReference = '', fullContex
     '<product_context>', task.product, '</product_context>',
     '<design_context>', task.design, '</design_context>',
     '<action_reference>', actionReference, '</action_reference>',
+    '<annotation_context>', JSON.stringify(task.annotation || {}, null, 2), '</annotation_context>',
     '<source_files>', JSON.stringify(task.files, null, 2), '</source_files>',
   ].filter((line) => line !== '').join('\n');
 }
@@ -193,17 +210,25 @@ export function scoreCodexQualityOutput(task, output) {
   const source = byPath['src/App.jsx'] || '';
   const css = byPath['src/styles.css'] || '';
   const normalizedSource = source.replace(/[\s"']/g, '');
+  const visibleSourceText = source.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   const checks = {
     exactFiles: files.length === 2 && Boolean(source) && Boolean(css),
     implementationChanged: source !== task.files['src/App.jsx'] || css !== task.files['src/styles.css'],
-    copyPreserved: task.requiredCopy.every((value) => combined.includes(value)),
+    copyPreserved: task.requiredCopy.every((value) => (
+      combined.includes(value) || visibleSourceText.includes(value.replace(/\s+/g, ' ').trim())
+    )),
     contractsPreserved: task.requiredSource.every((value) => normalizedSource.includes(value.replace(/[\s"']/g, ''))),
     tokensPreserved: task.requiredTokens.every((value) => css.includes(value)),
     noForbiddenDrift: task.forbidden.every((pattern) => {
+      const outputWithoutAllowedMatches = stripAllowedForbiddenMatches(combined, task.allowedForbiddenMatches);
+      const inputWithoutAllowedMatches = stripAllowedForbiddenMatches(
+        Object.values(task.files).join('\n'),
+        task.allowedForbiddenMatches,
+      );
       pattern.lastIndex = 0;
-      const outputMatches = combined.match(pattern) || [];
+      const outputMatches = outputWithoutAllowedMatches.match(pattern) || [];
       pattern.lastIndex = 0;
-      const inputMatches = Object.values(task.files).join('\n').match(pattern) || [];
+      const inputMatches = inputWithoutAllowedMatches.match(pattern) || [];
       return outputMatches.length <= inputMatches.length;
     }),
   };
@@ -211,6 +236,13 @@ export function scoreCodexQualityOutput(task, output) {
     passed: Object.values(checks).every(Boolean),
     checks,
   };
+}
+
+function stripAllowedForbiddenMatches(value, patterns = []) {
+  return patterns.reduce((result, pattern) => {
+    pattern.lastIndex = 0;
+    return result.replace(pattern, '');
+  }, value);
 }
 
 export function buildJudgePrompt(task, output) {
@@ -221,6 +253,7 @@ export function buildJudgePrompt(task, output) {
     '',
     `TASK: /${task.action} — ${task.brief}`,
     `REVIEW FOCUS: ${task.judgeFocus}`,
+    '<annotation_context>', JSON.stringify(task.annotation || {}, null, 2), '</annotation_context>',
     '<product_context>', task.product, '</product_context>',
     '<design_context>', task.design, '</design_context>',
     '<before>', JSON.stringify(task.files, null, 2), '</before>',
