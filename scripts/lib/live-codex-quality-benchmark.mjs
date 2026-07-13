@@ -149,7 +149,7 @@ export function createCodexQualityTasks({ repoRoot }) {
         'src/styles.css': readFileSync(path.join(fixtureDir, 'styles.css'), 'utf-8'),
       },
       requiredCopy: ['Quarterly print edition', 'Field Notes', 'Four routes, annotated maps, and practical details for unhurried weekends.', 'Reserve issue eight'],
-      requiredSource: ['function ActionLink', '<ActionLink>Reserve issue eight</ActionLink>', 'aria-labelledby="field-notes-title"'],
+      requiredSource: ['function ActionLink', '<ActionLink>Reserve issue eight</ActionLink>', 'aria-labelledby=field-notes-title'],
       requiredTokens: ['--color-paper', '--color-paper-deep', '--color-ink', '--color-moss', '--color-brass', '--font-display', '--font-body'],
       forbidden: [/gradient\s*\(/i, /box-shadow\s*:/i, /filter\s*:\s*blur/i, /#[0-9a-f]{3,8}\b/gi],
       judgeFocus: 'Is the selected offer materially more decisive through hierarchy/proportion/composition, while remaining restrained editorial design rather than generic AI boldness?',
@@ -162,7 +162,7 @@ export function createCodexQualityTasks({ repoRoot }) {
       design: '# Relay design system\n\nCompact, neutral, table-first application UI. Use existing tokens and components. Status color communicates meaning only. Avoid gradients, decorative shadows, oversized display type, rounded-card proliferation, and invented navigation.',
       files: { 'src/App.jsx': OPERATIONS_APP, 'src/styles.css': OPERATIONS_CSS },
       requiredCopy: ['Fulfillment overview', 'Create dispatch', 'Ready', 'At risk', 'Blocked', 'Needs attention', 'View all 19', 'DP-2048', 'DP-2051', 'DP-2057'],
-      requiredSource: ['function Metric', '<Metric label="Ready"', '<table>', 'aria-labelledby="queue-title"'],
+      requiredSource: ['function Metric', '<Metric label=Ready', '<table', 'aria-labelledby=queue-title'],
       requiredTokens: ['--canvas', '--surface', '--ink', '--ink-muted', '--line', '--accent', '--positive', '--warning', '--critical'],
       forbidden: [/gradient\s*\(/i, /box-shadow\s*:/i, /backdrop-filter/i, /border-radius\s*:\s*(?:1|2|3|4|5|6|7|8|9)rem/i],
       judgeFocus: 'Is this a materially more polished, efficient operations surface, with excellent scan hierarchy and interaction detail, without changing its product model or turning it into a decorative dashboard?',
@@ -192,12 +192,12 @@ export function scoreCodexQualityOutput(task, output) {
   const combined = Object.values(byPath).join('\n');
   const source = byPath['src/App.jsx'] || '';
   const css = byPath['src/styles.css'] || '';
+  const normalizedSource = source.replace(/[\s"']/g, '');
   const checks = {
     exactFiles: files.length === 2 && Boolean(source) && Boolean(css),
-    sourceChanged: source !== task.files['src/App.jsx'],
-    stylesChanged: css !== task.files['src/styles.css'],
+    implementationChanged: source !== task.files['src/App.jsx'] || css !== task.files['src/styles.css'],
     copyPreserved: task.requiredCopy.every((value) => combined.includes(value)),
-    contractsPreserved: task.requiredSource.every((value) => source.includes(value)),
+    contractsPreserved: task.requiredSource.every((value) => normalizedSource.includes(value.replace(/[\s"']/g, ''))),
     tokensPreserved: task.requiredTokens.every((value) => css.includes(value)),
     noForbiddenDrift: task.forbidden.every((pattern) => {
       pattern.lastIndex = 0;

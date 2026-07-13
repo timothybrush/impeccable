@@ -32,6 +32,14 @@ describe('Codex Live quality benchmark', () => {
     const noOp = { files: Object.entries(task.files).map(([filePath, content]) => ({ path: filePath, content })) };
     assert.equal(scoreCodexQualityOutput(task, noOp).passed, false);
 
+    const cssOnly = {
+      files: [
+        { path: 'src/App.jsx', content: task.files['src/App.jsx'] },
+        { path: 'src/styles.css', content: `${task.files['src/styles.css']}\n.offer-card { min-height: 30rem; }` },
+      ],
+    };
+    assert.equal(scoreCodexQualityOutput(task, cssOnly).passed, true, 'CSS-only design work is a material implementation change');
+
     const drift = {
       files: [
         { path: 'src/App.jsx', content: task.files['src/App.jsx'].replace('Field Notes', 'Neon Notes') },
