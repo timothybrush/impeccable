@@ -38,6 +38,7 @@ export function buildRenderedReviewContext({ fixture, fixtureConfig, action, bri
     action: selectedAction,
     brief: String(brief || configured.brief || `Apply /${selectedAction} to the selected element while preserving its project identity and functional contract.`),
     captureSelector: String(configured.captureSelector || fixtureConfig?.runtime?.pickSelector || 'body'),
+    captureMode: configured.mode === 'target' ? 'target' : 'selector',
     safeContext: {
       fixture: String(fixture || ''),
       reviewFocus: String(configured.reviewFocus || ''),

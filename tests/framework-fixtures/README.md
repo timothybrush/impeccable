@@ -143,11 +143,17 @@ An external fixture has the same shape as a directory in this folder:
 {
   "evidenceCapture": {
     "captureSelector": "section.case-study",
+    "mode": "target",
     "viewport": { "width": 1440, "height": 1080 },
     "action": "bolder"
   }
 }
 ```
+
+Use `"mode": "target"` when `captureSelector` is the picked element itself;
+the original resolves through that selector and each variant resolves through
+its exact Live wrapper. Omit it when the selector is a stable ancestor used as
+shared page context for every capture.
 
 The bundle contains `report.json`, the original capture, each progressively
 delivered variant capture, geometry/overflow facts, hashes, and timing data.

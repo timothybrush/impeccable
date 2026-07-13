@@ -192,7 +192,7 @@ try {
       renderedArtifacts.variants.push(await captureRenderedElement(session.page, {
         filePath: join(runArtifactDir, `variant-${acceptVariant}.png`),
         variantId: acceptVariant,
-        selector: renderedContext.captureSelector,
+        selector: renderedContext.captureMode === 'target' ? null : renderedContext.captureSelector,
       }));
     }
     const browserTiming = await readBrowserTimingProbe(session.page);
@@ -206,7 +206,7 @@ try {
           renderedArtifacts.variants.push(await captureRenderedElement(session.page, {
             filePath: join(runArtifactDir, `variant-${variantId}.png`),
             variantId,
-            selector: renderedContext.captureSelector,
+            selector: renderedContext.captureMode === 'target' ? null : renderedContext.captureSelector,
           }));
         }
         await ensureBenchmarkVariant(session.page, 1);
@@ -310,7 +310,8 @@ try {
     root: evidenceRoot ? '.' : artifactRoot.startsWith(`${ROOT}${sep}`) ? relative(ROOT, artifactRoot) : null,
     externalRoot: evidenceRoot ? false : !artifactRoot.startsWith(`${ROOT}${sep}`),
     report: evidenceRoot ? 'report.json' : null,
-    screenshotScope: renderedContext.captureSelector,
+    screenshotScope: renderedContext.captureMode === 'target' ? 'selected-target' : renderedContext.captureSelector,
+    sourceSelector: renderedContext.captureSelector,
   };
   if (judgeRendered) {
     report.renderedQuality = {
@@ -348,7 +349,7 @@ async function readGenerationSnapshot(tmp, eventId) {
 }
 
 async function captureRenderedElement(page, { filePath, selector = null, variantId = null }) {
-  const geometry = await page.evaluate(({ targetSelector, targetVariantId }) => {
+  const geometry = await page.evaluate(async ({ targetSelector, targetVariantId }) => {
     const wrapper = targetVariantId == null ? null : document.querySelector('[data-impeccable-variants]');
     const variant = targetVariantId == null
       ? null
@@ -358,7 +359,8 @@ async function captureRenderedElement(page, { filePath, selector = null, variant
       ? document.querySelector(targetSelector)
       : variant?.firstElementChild;
     if (!element) return null;
-    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    await new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)));
     const rect = element.getBoundingClientRect();
     const style = getComputedStyle(element);
     const core = window.__IMPECCABLE_LIVE_CHROME_CORE__;
@@ -371,10 +373,10 @@ async function captureRenderedElement(page, { filePath, selector = null, variant
     const padding = 40;
     const pageWidth = Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0);
     const pageHeight = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight || 0);
-    const x = Math.max(0, rect.left + window.scrollX - padding);
-    const y = Math.max(0, rect.top + window.scrollY - padding);
-    const width = Math.max(1, Math.min(pageWidth - x, rect.width + padding * 2));
-    const height = Math.max(1, Math.min(pageHeight - y, rect.height + padding * 2));
+    const x = Math.floor(Math.max(0, rect.left + window.scrollX - padding));
+    const y = Math.floor(Math.max(0, rect.top + window.scrollY - padding));
+    const width = Math.max(1, Math.min(Math.floor(pageWidth - x), Math.ceil(rect.width + padding * 2)));
+    const height = Math.max(1, Math.min(Math.floor(pageHeight - y), Math.ceil(rect.height + padding * 2)));
     return {
       x, y, width, height,
       elementWidth: rect.width,
@@ -394,9 +396,15 @@ async function captureRenderedElement(page, { filePath, selector = null, variant
       await document.fonts?.ready;
       await new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame)));
     });
-    await page.screenshot({
+    const screenshotSelector = selector
+      || `[data-impeccable-variant="${variantId}"] > :first-child`;
+    const screenshotTarget = page.locator(screenshotSelector);
+    const screenshotTargetCount = await screenshotTarget.count();
+    if (screenshotTargetCount !== 1) {
+      throw new Error(`rendered capture selector ${screenshotSelector} matched ${screenshotTargetCount} elements`);
+    }
+    await screenshotTarget.screenshot({
       path: filePath,
-      clip: { x: geometry.x, y: geometry.y, width: geometry.width, height: geometry.height },
       animations: 'disabled',
       caret: 'hide',
     });

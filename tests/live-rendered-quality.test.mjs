@@ -54,6 +54,7 @@ describe('Live rendered quality judge', () => {
         runtime: { pickSelector: '.picked' },
         evidenceCapture: {
           captureSelector: '.selected-section',
+          mode: 'target',
           action: 'bolder',
         },
         renderedQuality: {
@@ -63,6 +64,7 @@ describe('Live rendered quality judge', () => {
       },
     });
     assert.equal(context.captureSelector, '.selected-section');
+    assert.equal(context.captureMode, 'target');
     assert.equal(context.action, 'bolder');
     assert.equal(context.safeContext.reviewFocus, '');
   });
