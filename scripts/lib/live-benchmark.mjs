@@ -148,17 +148,22 @@ export function buildInteractionRun(events, { iteration, scenario, goStartedAt, 
 export function deriveJournalGenerationMetrics(snapshot = {}) {
   const timings = snapshot.generationTimings || {};
   const at = (phase) => Number(timings[phase]?.at);
-  const delta = (start, end) => (
-    Number.isFinite(at(start)) && Number.isFinite(at(end))
-      ? roundMs(Math.max(0, at(end) - at(start)))
-      : null
-  );
+  const timingErrors = [];
+  const delta = (start, end) => {
+    if (!Number.isFinite(at(start)) || !Number.isFinite(at(end))) return null;
+    if (at(end) < at(start)) {
+      timingErrors.push(`${end}_before_${start}`);
+      return null;
+    }
+    return roundMs(at(end) - at(start));
+  };
   return {
     workerPickupToSourceReadyMs: delta('picked_up', 'source_ready'),
     workerFirstGenerationToReviewableMs: delta('first_variant_generating', 'first_reviewable'),
     workerFirstValidationToReviewableMs: delta('first_variant_validating', 'first_reviewable'),
     workerRemainingGenerationToReadyMs: delta('remaining_variants_generating', 'all_variants_ready'),
     workerRemainingValidationToReadyMs: delta('remaining_variants_validating', 'all_variants_ready'),
+    journalTimingErrors: timingErrors,
     journalGenerationTimings: timings,
   };
 }

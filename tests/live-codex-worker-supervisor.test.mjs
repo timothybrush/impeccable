@@ -160,6 +160,31 @@ describe('Codex Live worker supervisor ownership and lifecycle', () => {
     }]);
   });
 
+  it('renews but never queues the same long-running generation twice', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'codex-supervisor-duplicate-lease-'));
+    const client = fakeClient();
+    const supervisor = createSupervisor({
+      cwd,
+      statePath: path.join(cwd, 'state.json'),
+      client,
+    });
+    supervisor.thread = { id: 'live-worker-thread' };
+    let generations = 0;
+    supervisor.processGeneration = async () => {
+      generations += 1;
+      await new Promise((resolve) => setImmediate(resolve));
+    };
+    const events = [
+      { type: 'generate', id: 'generation-1', count: 3 },
+      { type: 'generate', id: 'generation-1', count: 3 },
+      { type: 'exit' },
+    ];
+    supervisor.fetchEvent = async () => events.shift();
+    await supervisor.run();
+    assert.equal(generations, 1);
+    assert.equal(supervisor.queuedGenerationIds.size, 0);
+  });
+
   it('reconnects and resumes the owned worker once after app-server loss', async () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'codex-supervisor-reconnect-'));
     const client = fakeClient();

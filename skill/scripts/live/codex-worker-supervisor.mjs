@@ -69,6 +69,7 @@ export class CodexLiveWorkerSupervisor {
     this.queue = Promise.resolve();
     this.active = null;
     this.canceled = new Set();
+    this.queuedGenerationIds = new Set();
     this.thread = null;
     this.model = null;
     this.liveSpec = '';
@@ -143,9 +144,12 @@ export class CodexLiveWorkerSupervisor {
         continue;
       }
       if (event.type === 'generate') {
+        if (this.queuedGenerationIds.has(event.id)) continue;
+        this.queuedGenerationIds.add(event.id);
         this.queue = this.queue
           .then(() => this.processGeneration(event))
-          .catch((error) => this.handleGenerationFailure(event, error));
+          .catch((error) => this.handleGenerationFailure(event, error))
+          .finally(() => this.queuedGenerationIds.delete(event.id));
         continue;
       }
       if (event.type === 'prefetch') continue;

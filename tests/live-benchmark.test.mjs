@@ -30,6 +30,18 @@ describe('live benchmark metrics', () => {
     assert.equal(metrics.workerFirstValidationToReviewableMs, 30);
     assert.equal(metrics.workerRemainingGenerationToReadyMs, 185);
     assert.equal(metrics.workerRemainingValidationToReadyMs, 30);
+    assert.deepEqual(metrics.journalTimingErrors, []);
+  });
+
+  it('surfaces non-monotonic worker phases instead of reporting a false zero', () => {
+    const metrics = deriveJournalGenerationMetrics({
+      generationTimings: {
+        first_variant_generating: { at: 300 },
+        first_reviewable: { at: 200 },
+      },
+    });
+    assert.equal(metrics.workerFirstGenerationToReviewableMs, null);
+    assert.deepEqual(metrics.journalTimingErrors, ['first_reviewable_before_first_variant_generating']);
   });
 
   it('keeps published progressive CSS byte-stable and carries deferred params', () => {
