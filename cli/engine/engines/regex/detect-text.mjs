@@ -2,7 +2,7 @@ import { GENERIC_FONTS, OVERUSED_FONTS } from '../../shared/constants.mjs';
 import { isNeutralColor } from '../../shared/color.mjs';
 import { extractGoogleFontFamilies } from '../../shared/fonts.mjs';
 import { checkSourceDesignSystem } from '../../design-system.mjs';
-import { scanCssTextForGlow, scanCssTextForRadialHalo } from '../../rules/checks.mjs';
+import { scanCssTextForGlow, scanCssTextForMarquee, scanCssTextForRadialHalo } from '../../rules/checks.mjs';
 import { isFullPage } from '../../shared/page.mjs';
 import { applyInlineIgnores } from '../../shared/inline-ignores.mjs';
 import { finding } from '../../findings.mjs';
@@ -334,6 +334,9 @@ const REGEX_ANALYZERS = [
     const lines = content.substring(0, hits[0].index).split('\n');
     return [finding('radial-halo', filePath, hits[0].snippet, lines.length)];
   },
+  // Auto-scrolling marquees (<marquee> or infinite horizontal loop
+  // animations).
+  (content, filePath) => scanCssTextForMarquee(content).map(hit => finding('marquee', filePath, hit.snippet)),
 ];
 
 // ---------------------------------------------------------------------------

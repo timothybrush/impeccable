@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { profileStep, recordProfileEvent } from '../../profile/profiler.mjs';
-import { parseAnyColor, resolveLengthPx, resolveVarRefs } from '../../rules/checks.mjs';
+import { collectCssCustomProps, cssLengthToPx, parseAnyColor, resolveLengthPx, resolveVarRefs } from '../../rules/checks.mjs';
 
 // ---------------------------------------------------------------------------
 // jsdom CSS-variable border override map
@@ -840,6 +840,7 @@ class StaticDocument {
     this._wrappers = new WeakMap();
     this._styleMap = new WeakMap();
     this._hoverStyleMap = new WeakMap();
+    this._accentDashPseudo = new WeakSet();
   }
   wrap(node) {
     let wrapped = this._wrappers.get(node);
@@ -882,6 +883,12 @@ class StaticDocument {
   getHoverStyle(el) {
     return this._hoverStyleMap.get(el.node) || null;
   }
+  setAccentDashPseudo(node) {
+    this._accentDashPseudo.add(node);
+  }
+  hasAccentDashPseudo(el) {
+    return this._accentDashPseudo.has(el.node);
+  }
 }
 
 function makeStaticStyle(values = {}) {
@@ -898,6 +905,7 @@ function buildStaticWindow(staticDoc) {
     document: staticDoc,
     getComputedStyle: (el) => staticDoc.getStyle(el),
     getHoverStyle: (el) => staticDoc.getHoverStyle(el),
+    hasAccentDashPseudo: (el) => staticDoc.hasAccentDashPseudo(el),
   };
 }
 
@@ -934,6 +942,7 @@ function buildStaticStyleMap(root, staticDoc, cssText, modules, profile, filePat
   // the cascade while the element is hovered (all resting rules still
   // apply in that state).
   const hoverSpecified = new Map();
+  const rootCustomProps = collectCssCustomProps(cssText);
   const allNodes = modules.selectAll('*', root.children || []);
   const rules = profileStep(profile, {
     engine: 'static-html',
@@ -949,6 +958,33 @@ function buildStaticStyleMap(root, staticDoc, cssText, modules, profile, filePat
     target: filePath,
   }, () => {
     for (const rule of rules) {
+      // ::before/::after rules can't join the element cascade (pseudo
+      // elements aren't DOM nodes), but one shape matters to the eyebrow
+      // check: the short chromatic "kicker dash" (content box 8-80px wide,
+      // 1-6px tall, accent-colored fill). Mark the base-selector matches
+      // so checkElementHeroEyebrow can see the dash.
+      if (!rule.isHover) {
+        const pm = rule.selector.match(/^(.+?)\s*::?(?:before|after)$/i);
+        if (pm) {
+          const decls = new Map();
+          for (const d of rule.declarations) decls.set(d.prop.toLowerCase(), d.value);
+          const w = cssLengthToPx(resolveVarRefs(decls.get('width') || decls.get('inline-size') || '', rootCustomProps));
+          const h = cssLengthToPx(resolveVarRefs(decls.get('height') || decls.get('block-size') || '', rootCustomProps));
+          if (w != null && h != null && w >= 8 && w <= 80 && h >= 1 && h <= 6) {
+            const bgRaw = String(resolveVarRefs(decls.get('background-color') || decls.get('background') || '', rootCustomProps));
+            const token = bgRaw.match(/(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb|color-mix)\([^)]*(?:\([^)]*\))?[^)]*\)|#[0-9a-f]{3,8}\b/i);
+            const c = parseAnyColor(token ? token[0] : bgRaw);
+            if (c && (c.a ?? 1) >= 0.1 && Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) >= 30) {
+              try {
+                for (const node of modules.selectAll(pm[1], root.children || [])) {
+                  staticDoc.setAccentDashPseudo(node);
+                }
+              } catch { /* unsupported base selector */ }
+            }
+          }
+          continue;
+        }
+      }
       const matchSelector = rule.isHover ? rule.matchSelector : rule.selector;
       if (!matchSelector) continue;
       let matched;

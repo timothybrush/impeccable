@@ -234,6 +234,15 @@ const ANTIPATTERNS = [
     skillGuideline: 'dark mode with glowing accents',
   },
   {
+    id: 'marquee',
+    category: 'slop',
+    name: 'Auto-scrolling marquee',
+    description:
+      'Continuously auto-scrolling content demands attention it has not earned and hides half its content at any moment. Reserve motion for content that changes; let readers move at their own pace.',
+    skillSection: 'Motion',
+    skillGuideline: 'auto-scrolling marquee',
+  },
+  {
     id: 'icon-tile-stack',
     category: 'slop',
     scopes: ['layout'],
@@ -538,7 +547,7 @@ const ANTIPATTERNS = [
     gated: 'gpt',
     name: 'Decorative grid-line background',
     description:
-      'A two-axis grid drawn with hairline linear-gradient layers ("1px, transparent 1px" on both axes) is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.',
+      'A decorative grid or line-field background drawn with hairline linear-gradient layers tiled by a fixed pixel cell is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.',
     skillSection: 'Visual Details',
     skillGuideline: 'two-axis grid-line gradient background',
   },
@@ -1039,6 +1048,7 @@ function checkHeroEyebrow(opts) {
     siblingTag, siblingText, siblingTextTransform,
     siblingFontSize, siblingLetterSpacing,
     siblingFontWeight, siblingColor,
+    siblingHasAccentDashPseudo,
   } = opts;
   if (headingTag !== 'h1') return [];
   // We previously gated on headingFontSize >= 48 to anchor "hero scale".
@@ -1070,11 +1080,16 @@ function checkHeroEyebrow(opts) {
   const weight = Number(siblingFontWeight) || 400;
   const isAccentBold = weight >= 700 && isAccentColor(siblingColor || '');
 
-  if (!isClassicTracked && !isAccentBold) return [];
+  // Branch C: dash-prefix eyebrow — sentence case, low tracking, regular
+  // weight, but announced by a short chromatic ::before/::after bar
+  // (the kicker dash). Same label-above-headline pattern, third styling.
+  const isDashPrefixed = !!siblingHasAccentDashPseudo;
+
+  if (!isClassicTracked && !isAccentBold && !isDashPrefixed) return [];
 
   const headingTextSnippet = (headingText || '').trim().slice(0, 60);
   const eyebrowSnippet = text.slice(0, 40);
-  const style = isClassicTracked ? 'tracked-caps' : 'accent-bold';
+  const style = isClassicTracked ? 'tracked-caps' : isAccentBold ? 'accent-bold' : 'dash-prefix';
   return [{
     id: 'hero-eyebrow-chip',
     snippet: `eyebrow chip (${style}) "${eyebrowSnippet}" above ${headingTag} "${headingTextSnippet}"`,
@@ -1509,6 +1524,137 @@ function scanCssTextForPseudoStripe(content) {
   return findings;
 }
 
+// Side-tab stripe drawn as a single-edge inset box-shadow
+// (x or y offset 3-12px, other axis 0, no blur/spread, chromatic color):
+// paints a bar along one edge with no border property involved, so the
+// element-level border checks never see it. Selection-state indicators
+// are exempt — an inset stripe on [aria-current] / .active / [role=tab]
+// marks the selected item; the same stripe unconditionally on every item
+// is decoration and flags.
+function scanCssTextForInsetStripe(content) {
+  const customProps = collectCssCustomProps(content);
+  const findings = [];
+  const seen = new Set();
+  const ruleRe = new RegExp(CSS_RULE_BLOCK_SOURCE, 'g');
+  let m;
+  while ((m = ruleRe.exec(content)) !== null) {
+    const selector = m[1].trim();
+    // State/selection contexts: current-item markers, interaction states,
+    // explicit tab semantics.
+    if (/:(?:hover|focus|focus-visible|focus-within|active|checked|target)\b/i.test(selector)) continue;
+    if (/\[aria-(?:current|selected)/i.test(selector)) continue;
+    if (/\[role=["']?tab/i.test(selector)) continue;
+    if (/(?:^|[\s._[-])(?:active|current|selected|tabs?)(?![\w])/i.test(selector)) continue;
+    // Structural tags where a single-edge inset shadow is depth/quoting,
+    // not an accent stripe.
+    if (/(?:^|[\s>+~,(])(?:button|hr|tr|td|th|table|blockquote|pre|code)(?![\w-])/i.test(selector)) continue;
+
+    const decls = parseCssDeclBlock(m[2]);
+    const shadow = decls.get('box-shadow');
+    if (!shadow || !/\binset\b/i.test(shadow)) continue;
+    // Narrow fixed-width elements (logo marks, icon glyphs) use inset
+    // fills as artwork, not edge stripes. Stripe targets — cards, badges,
+    // menu items — are wider or leave width to layout.
+    const declaredWidth = cssLengthToPx(resolveVarRefs(decls.get('width') || decls.get('inline-size') || '', customProps));
+    if (declaredWidth != null && declaredWidth <= 40) continue;
+    const value = resolveVarRefs(shadow, customProps);
+    for (const layer of value.split(/,(?![^(]*\))/)) {
+      if (!/\binset\b/i.test(layer)) continue;
+      const colorInfo = findShadowColor(layer);
+      // Unresolvable colors (currentColor, external vars): don't guess.
+      if (!colorInfo || !colorInfo.color) continue;
+      const c = colorInfo.color;
+      if ((c.a ?? 1) < 0.1) continue;
+      const chroma = Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b);
+      if (chroma < 30) continue;
+      const vals = extractShadowLengths(layer, colorInfo.start, colorInfo.end);
+      const x = vals[0] || 0, y = vals[1] || 0, blur = vals[2] || 0, sp = vals[3] || 0;
+      if (blur !== 0 || sp !== 0) continue;
+      const ax = Math.abs(x), ay = Math.abs(y);
+      const isStripe = (ax >= 3 && ax <= 12 && ay === 0) || (ay >= 3 && ay <= 12 && ax === 0);
+      if (!isStripe) continue;
+      if (seen.has(selector)) break;
+      seen.add(selector);
+      const edge = ay === 0 ? (x > 0 ? 'left' : 'right') : (y > 0 ? 'top' : 'bottom');
+      findings.push({
+        id: 'side-tab',
+        snippet: `${selector} — inset box-shadow ${ay === 0 ? ax : ay}px stripe (${edge})`,
+      });
+      break;
+    }
+  }
+  return findings;
+}
+
+// Collect @keyframes names whose body travels horizontally — the marquee
+// loop. X travel is measured across every translateX/translate/translate3d
+// X component in the body: a centered element animating something else
+// keeps a constant -50% X (zero travel) and never qualifies, while a
+// ticker moves from its resting position to a large offset. Keyframes
+// with a single X sample that also vary scale/opacity read as pulses or
+// breathes, not marquees.
+function collectMarqueeKeyframes(content) {
+  const names = new Set();
+  const re = /@(?:-webkit-)?keyframes\s+([\w-]+)\s*\{/g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    let depth = 1;
+    let i = re.lastIndex;
+    while (i < content.length && depth > 0) {
+      const ch = content.charCodeAt(i);
+      if (ch === 0x7b /* { */) depth++;
+      else if (ch === 0x7d /* } */) depth--;
+      i++;
+    }
+    const body = content.slice(re.lastIndex, Math.max(re.lastIndex, i - 1));
+    re.lastIndex = i;
+
+    // Only percentage travel qualifies: a content marquee translates by a
+    // fraction of its own (unknown) track width, so generated tickers use
+    // -50% / -100%. Pixel-travel loops are bespoke product animations —
+    // sweeping playheads, progress indicators — not marquees.
+    const pct = [];
+    const xRe = /\btranslate(?:X|3d)?\(\s*(-?[\d.]+)%/gi;
+    let xm;
+    while ((xm = xRe.exec(body)) !== null) pct.push(parseFloat(xm[1]));
+    if (pct.length === 0) continue;
+    if (pct.length === 1 && /\bscale\(|\bopacity\s*:/i.test(body)) continue;
+    // Implicit start: a lone declared X animates from the element's
+    // resting position, so its magnitude is the travel.
+    const travelPct = pct.length > 1 ? Math.max(...pct) - Math.min(...pct) : Math.abs(pct[0]);
+    if (travelPct >= 20) names.add(m[1]);
+  }
+  return names;
+}
+
+// Auto-scrolling marquee: a <marquee> element, or an infinite animation
+// bound to a keyframe loop that travels a large horizontal distance.
+// Rotation/opacity animations never qualify (no X travel); JS-driven
+// carousels with user controls have no infinite CSS X-loop to match.
+function scanCssTextForMarquee(content) {
+  const findings = [];
+  if (/<marquee\b/i.test(content)) {
+    findings.push({ id: 'marquee', snippet: '<marquee> element' });
+  }
+  const marqueeKeyframes = collectMarqueeKeyframes(content);
+  if (marqueeKeyframes.size === 0) return findings;
+  const seen = new Set();
+  const ruleRe = new RegExp(CSS_RULE_BLOCK_SOURCE, 'g');
+  let m;
+  while ((m = ruleRe.exec(content)) !== null) {
+    const selector = m[1].trim();
+    const decls = parseCssDeclBlock(m[2]);
+    for (const name of infiniteAnimationNames(decls)) {
+      if (!marqueeKeyframes.has(name)) continue;
+      const key = `${selector} ${name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push({ id: 'marquee', snippet: `${selector} — infinite horizontal loop animation "${name}"` });
+    }
+  }
+  return findings;
+}
+
 // Collect @keyframes names and whether each one reads as a "pulse" —
 // i.e. it varies opacity, scale, or box-shadow. Rotation-only keyframes
 // (spinners) are explicitly not pulses.
@@ -1679,6 +1825,9 @@ function checkHtmlPatterns(html) {
   // the border-left regexes never see it).
   findings.push(...scanCssTextForPseudoStripe(html));
 
+  // Side-tab accent stripe drawn as a single-edge inset box-shadow.
+  findings.push(...scanCssTextForInsetStripe(html));
+
   // --- Layout ---
 
   // Monotonous spacing
@@ -1757,6 +1906,9 @@ function checkHtmlPatterns(html) {
   // Pulsing status dots (tiny circular elements on infinite pulse animations)
   findings.push(...scanCssTextForPulsingDot(html));
 
+  // Auto-scrolling marquees (<marquee> or infinite horizontal loop animations)
+  findings.push(...scanCssTextForMarquee(html));
+
   // --- Dark glow / chromatic halo shadows ---
 
   const glowHits = scanCssTextForGlow(html);
@@ -1789,23 +1941,47 @@ function checkHtmlPatterns(html) {
   // nested parens, so match the hairline stop directly rather than parsing
   // whole gradient layers.
   {
+    // Hairline stop shapes: the classic leading form (`<color> 1px,
+    // transparent 1px`) and the inverted end-of-tile form
+    // (`transparent calc(100% - 1px), <color> 1px`).
     const hairlineRe = /\b\d{1,3}px\s*,\s*transparent\s+\d{1,3}px/gi;
-    const gridSizeRe = /background-size\s*:[^;{}"']*\b\d{1,3}px\b/i;
+    const invertedHairlineRe = /transparent\s+calc\(100%\s*-\s*\d{1,3}px\)/gi;
+    // Tiling cell: a background-size declaration with px values, or the
+    // background shorthand's `/ <size>` slot (only matched inside
+    // background values so border-radius slash syntax can't stand in).
+    const sizeDeclPxRe = /background-size\s*:[^;{}"']*\b\d{1,3}px\b/i;
+    const sizeDeclPxPairRe = /background-size\s*:[^;{}"']*\b\d{1,3}px\s+\d{1,3}px/i;
+    const shorthandPxAnyRe = /\/\s*\d{1,3}px\b/;
+    const shorthandPxPairRe = /\/\s*\d{1,3}px\s+\d{1,3}px/;
     const bgDeclRe = /\bbackground(?:-image)?\s*:\s*([^;{}"']*)/gi;
     const blockRe = /\{([^{}]*)\}|style\s*=\s*"([^"]*)"|style\s*=\s*'([^']*)'/gi;
     let blk;
     while ((blk = blockRe.exec(html)) !== null) {
       const block = blk[1] || blk[2] || blk[3] || '';
-      if (!gridSizeRe.test(block)) continue;
       let hairlineCount = 0;
+      let bgJoined = '';
       let bm;
       bgDeclRe.lastIndex = 0;
       while ((bm = bgDeclRe.exec(block)) !== null) {
-        const stops = bm[1].match(hairlineRe);
-        if (stops) hairlineCount += stops.length;
+        hairlineCount += (bm[1].match(hairlineRe) || []).length;
+        hairlineCount += (bm[1].match(invertedHairlineRe) || []).length;
+        bgJoined += bm[1] + ';';
       }
-      if (hairlineCount >= 2) {
-        findings.push({ id: 'codex-grid-background', snippet: 'two-axis grid-line gradient background' });
+      if (hairlineCount === 0) continue;
+      const hasPxCell = sizeDeclPxRe.test(block) || shorthandPxAnyRe.test(bgJoined);
+      const hasPxPairCell = sizeDeclPxPairRe.test(block) || shorthandPxPairRe.test(bgJoined);
+      // Two hairline layers + any px tile = the classic two-axis grid.
+      // A single hairline layer only counts when tiled by a px pair cell
+      // (e.g. `/ 40px 40px`) — a page-scale repeating line field. Single
+      // hairlines tiled by percentage cells (`background-size: 25% 100%`)
+      // are structural rules on data-viz tracks/graphs and stay legal.
+      if ((hairlineCount >= 2 && hasPxCell) || hasPxPairCell) {
+        findings.push({
+          id: 'codex-grid-background',
+          snippet: hairlineCount >= 2
+            ? 'two-axis grid-line gradient background'
+            : 'px-tiled hairline line-field background',
+        });
         break;
       }
     }
@@ -2005,18 +2181,21 @@ function resolveBorderRadiusPx(el, style, widthPx, win) {
 
 // Browser adapters — call getComputedStyle/getBoundingClientRect on live DOM
 
-// Tab-strip / selected-state context: a top or bottom accent on an element
-// inside a tablist, nav, or aria-selected widget is an active-state
-// underline affordance, not a decorative stripe.
+// Selected-state / tab-strip context for accent stripes. Explicit tab
+// semantics ([role=tablist]/[role=tab]) and active/current-item markers
+// (aria-selected, aria-current, active/current/selected class hints)
+// exempt the stripe as a selection indicator. A bare nav/menu ancestor
+// deliberately does NOT — the same stripe repeated unconditionally on
+// every menu item is decoration, not state.
 function isTabContextElement(el) {
   if (!el) return false;
   try {
-    if (el.closest?.('[role="tablist"], [role="tab"], nav, [aria-selected]')) return true;
+    if (el.closest?.('[role="tablist"], [role="tab"], [aria-selected], [aria-current]')) return true;
   } catch { /* selector engine differences — fall through to class scan */ }
   let cur = el, depth = 0;
   while (cur && cur.nodeType === 1 && depth < 6) {
     const cls = String(cur.getAttribute?.('class') || cur.className || '');
-    if (/(?:^|[\s_-])tabs?(?:$|[\s_-])/i.test(cls)) return true;
+    if (/(?:^|[\s_-])(?:tabs?|active|current|selected)(?:$|[\s_-])/i.test(cls)) return true;
     cur = cur.parentElement;
     depth++;
   }
@@ -2117,6 +2296,21 @@ function checkElementItalicSerifDOM(el) {
   });
 }
 
+function domAccentDashPseudo(el) {
+  for (const which of ['::before', '::after']) {
+    let ps;
+    try { ps = getComputedStyle(el, which); } catch { continue; }
+    if (!ps || ps.content === 'none' || ps.content === '') continue;
+    const w = parseFloat(ps.width) || 0;
+    const h = parseFloat(ps.height) || 0;
+    if (!(w >= 8 && w <= 80 && h >= 1 && h <= 6)) continue;
+    const bg = parseRgb(ps.backgroundColor) || parseAnyColor(ps.backgroundColor);
+    if (!bg || (bg.a ?? 1) < 0.1) continue;
+    if (Math.max(bg.r, bg.g, bg.b) - Math.min(bg.r, bg.g, bg.b) >= 30) return true;
+  }
+  return false;
+}
+
 function checkElementHeroEyebrowDOM(el) {
   const tag = el.tagName.toLowerCase();
   if (tag !== 'h1') return [];
@@ -2135,6 +2329,7 @@ function checkElementHeroEyebrowDOM(el) {
     siblingLetterSpacing: parseFloat(sibStyle.letterSpacing) || 0,
     siblingFontWeight: sibStyle.fontWeight || '',
     siblingColor: sibStyle.color || '',
+    siblingHasAccentDashPseudo: domAccentDashPseudo(sibling),
   });
 }
 
@@ -3407,6 +3602,11 @@ function checkElementHeroEyebrow(el, style, tag, window, customPropMap) {
     siblingLetterSpacing: resolveLengthPx(letterSpacingRaw, siblingFontSize) || 0,
     siblingFontWeight: fontWeightRaw || '',
     siblingColor: colorRaw || '',
+    // Static cascade marks elements matched by a ::before/::after rule
+    // whose geometry is a short chromatic dash (css-cascade.mjs).
+    siblingHasAccentDashPseudo: typeof window.hasAccentDashPseudo === 'function'
+      ? window.hasAccentDashPseudo(sibling)
+      : false,
   });
 }
 

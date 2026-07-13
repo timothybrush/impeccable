@@ -132,6 +132,15 @@ const ANTIPATTERNS = [
     skillGuideline: 'dark mode with glowing accents',
   },
   {
+    id: 'marquee',
+    category: 'slop',
+    name: 'Auto-scrolling marquee',
+    description:
+      'Continuously auto-scrolling content demands attention it has not earned and hides half its content at any moment. Reserve motion for content that changes; let readers move at their own pace.',
+    skillSection: 'Motion',
+    skillGuideline: 'auto-scrolling marquee',
+  },
+  {
     id: 'icon-tile-stack',
     category: 'slop',
     scopes: ['layout'],
@@ -436,7 +445,7 @@ const ANTIPATTERNS = [
     gated: 'gpt',
     name: 'Decorative grid-line background',
     description:
-      'A two-axis grid drawn with hairline linear-gradient layers ("1px, transparent 1px" on both axes) is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.',
+      'A decorative grid or line-field background drawn with hairline linear-gradient layers tiled by a fixed pixel cell is a recurring generated-UI signature. Reserve grid overlays for actual canvas, map, blueprint, or measurement surfaces; elsewhere use product structure or a plain surface.',
     skillSection: 'Visual Details',
     skillGuideline: 'two-axis grid-line gradient background',
   },

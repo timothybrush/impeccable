@@ -13,11 +13,15 @@ import {
 import { filterByScopes } from '../cli/engine/registry/antipatterns.mjs';
 import {
   checkElementTextOverflowDOM,
+  checkHeroEyebrow,
   checkHoverContrast,
+  checkHtmlPatterns,
   checkPageTypography,
   isScreenReaderOnlyTextStyle,
   parseAnyColor,
   parseColorMix,
+  scanCssTextForInsetStripe,
+  scanCssTextForMarquee,
   scanCssTextForPseudoStripe,
   scanCssTextForPulsingDot,
   scanCssTextForRadialHalo,
@@ -1214,6 +1218,185 @@ describe('hover contrast + color-mix', () => {
       isEmojiOnly: false,
     });
     expect(f).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Auto-scrolling marquee
+// ---------------------------------------------------------------------------
+
+describe('marquee', () => {
+  test('flags infinite percent-travel X loop (implicit start)', () => {
+    const css = `
+      .ticker-track { display: flex; width: max-content; animation: ticker 25s linear infinite; }
+      @keyframes ticker { to { transform: translateX(-50%); } }
+    `;
+    const f = scanCssTextForMarquee(css);
+    expect(f).toHaveLength(1);
+    expect(f[0].id).toBe('marquee');
+    expect(f[0].snippet).toContain('.ticker-track');
+  });
+
+  test('flags <marquee> elements', () => {
+    const f = scanCssTextForMarquee('<div><marquee>sale sale sale</marquee></div>');
+    expect(f).toHaveLength(1);
+    expect(f[0].snippet).toContain('<marquee>');
+  });
+
+  test('skips centered elements animating other properties', () => {
+    const css = `
+      .toast { animation: rise 3s ease infinite; }
+      @keyframes rise { from { transform: translate(-50%, 8px); } to { transform: translate(-50%, 0); } }
+    `;
+    expect(scanCssTextForMarquee(css)).toHaveLength(0);
+  });
+
+  test('skips non-infinite slide-in animations', () => {
+    const css = `
+      .panel { animation: enter 0.4s ease; }
+      @keyframes enter { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+    `;
+    expect(scanCssTextForMarquee(css)).toHaveLength(0);
+  });
+
+  test('skips px-travel sweeps (playheads, progress indicators)', () => {
+    const css = `
+      .wave-anim .playhead { animation: sweep 6s linear infinite; }
+      @keyframes sweep { from { transform: translateX(0); } to { transform: translateX(760px); } }
+    `;
+    expect(scanCssTextForMarquee(css)).toHaveLength(0);
+  });
+
+  test('skips rotation and pulse animations', () => {
+    const css = `
+      .spinner { animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .dot { animation: breathe 2s ease infinite; }
+      @keyframes breathe { 50% { transform: translateX(-50%) scale(1.1); opacity: 0.6; } }
+    `;
+    expect(scanCssTextForMarquee(css)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inset box-shadow stripes (side-tab variant)
+// ---------------------------------------------------------------------------
+
+describe('inset box-shadow stripe', () => {
+  test('flags single-edge chromatic inset stripes on repeated items', () => {
+    const css = `
+      :root { --good: #16a34a; }
+      .flag-good { box-shadow: inset 0 3px 0 var(--good); }
+      .callout { box-shadow: inset 4px 0 0 #dc2626; }
+    `;
+    const f = scanCssTextForInsetStripe(css);
+    expect(f).toHaveLength(2);
+    expect(f[0].id).toBe('side-tab');
+  });
+
+  test('exempts current/selected-state indicators', () => {
+    const css = `
+      .section-link[aria-current="location"] { box-shadow: inset 3px 0 0 #ea580c; }
+      .item.active { box-shadow: inset 3px 0 0 #ea580c; }
+      [role="tab"][aria-selected="true"] { box-shadow: inset 0 -3px 0 #ea580c; }
+      .link:hover { box-shadow: inset 3px 0 0 #ea580c; }
+    `;
+    expect(scanCssTextForInsetStripe(css)).toHaveLength(0);
+  });
+
+  test('skips narrow glyphs, blurred/spread shadows, neutrals, and thick fills', () => {
+    const css = `
+      .brand-mark { width: 13px; box-shadow: inset 0 -7px 0 #2563eb; }
+      .card { box-shadow: inset 0 3px 6px rgba(0,0,0,.2); }
+      .row { box-shadow: inset 0 1px 0 #e5e7eb; }
+      .well { box-shadow: inset 0 20px 0 #dc2626; }
+    `;
+    expect(scanCssTextForInsetStripe(css)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Grid-line background variants (checkHtmlPatterns block scan)
+// ---------------------------------------------------------------------------
+
+describe('codex-grid-background variants', () => {
+  const grids = (html) => checkHtmlPatterns(html).filter(f => f.id === 'codex-grid-background');
+
+  test('flags two-axis inverted-calc hairlines with shorthand tile size', () => {
+    const css = `body { background:
+      linear-gradient(90deg, transparent calc(100% - 1px), oklch(0.84 0.015 255 / 0.4) 1px) 0 0 / 48px 48px,
+      linear-gradient(transparent calc(100% - 1px), oklch(0.84 0.015 255 / 0.4) 1px) 0 0 / 48px 48px,
+      #eef1f7; }`;
+    expect(grids(css)).toHaveLength(1);
+  });
+
+  test('flags single-axis hairline tiled by a px pair cell', () => {
+    const css = `body { background: linear-gradient(90deg, rgba(23,25,24,.035) 1px, transparent 1px) 0 0 / 40px 40px, #f4f1ea; }`;
+    const f = grids(css);
+    expect(f).toHaveLength(1);
+    expect(f[0].snippet).toContain('line-field');
+  });
+
+  test('keeps percent-tiled single hairlines (data-viz track rules) legal', () => {
+    const css = `.span-track { background-image: linear-gradient(90deg, #303532 1px, transparent 1px); background-size: 25% 100%; }`;
+    expect(grids(css)).toHaveLength(0);
+  });
+
+  test('classic two-axis background-size form still flags', () => {
+    const css = `.hero { background-image:
+      linear-gradient(#eee 1px, transparent 1px),
+      linear-gradient(90deg, #eee 1px, transparent 1px);
+      background-size: 24px 24px; }`;
+    expect(grids(css)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hero eyebrow: dash-prefix branch
+// ---------------------------------------------------------------------------
+
+describe('hero-eyebrow dash-prefix branch', () => {
+  const base = {
+    headingTag: 'h1',
+    headingText: 'Find the service that started it.',
+    headingFontSize: 72,
+    siblingTag: 'p',
+    siblingText: 'Distributed tracing for microservices',
+    siblingTextTransform: 'none',
+    siblingFontSize: 13,
+    siblingLetterSpacing: 0.26,
+    siblingFontWeight: '400',
+    siblingColor: 'rgb(120, 120, 110)',
+  };
+
+  test('flags sentence-case label with accent dash pseudo', () => {
+    const f = checkHeroEyebrow({ ...base, siblingHasAccentDashPseudo: true });
+    expect(f).toHaveLength(1);
+    expect(f[0].snippet).toContain('dash-prefix');
+  });
+
+  test('same label without the dash stays legal', () => {
+    expect(checkHeroEyebrow({ ...base, siblingHasAccentDashPseudo: false })).toHaveLength(0);
+  });
+
+  test('static engine resolves the dash through the cascade', async () => {
+    await withStaticFixture({
+      'index.html': `<!DOCTYPE html><html><head><style>
+        :root { --signal: #e84a1c; }
+        .eyebrow { font-size: 13px; letter-spacing: .02em; color: #6f6a5f; }
+        .eyebrow::before { content: ""; width: 28px; height: 3px; background: var(--signal); }
+        h1 { font-size: 72px; }
+      </style></head><body><main>
+        <p class="eyebrow">Distributed tracing for microservices</p>
+        <h1>Find the service that started it.</h1>
+        <p>Body copy long enough to make this a real page for the scanners.</p>
+      </main></body></html>`,
+    }, async ({ file }) => {
+      const findings = await detectHtml(file);
+      const hits = findings.filter(f => f.antipattern === 'hero-eyebrow-chip');
+      expect(hits).toHaveLength(1);
+      expect(hits[0].snippet).toContain('dash-prefix');
+    });
   });
 });
 
