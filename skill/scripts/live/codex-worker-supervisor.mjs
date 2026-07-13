@@ -341,7 +341,7 @@ export class CodexLiveWorkerSupervisor {
           });
           if (!durableCandidate) {
             const candidatePath = path.resolve(this.cwd, prepared.artifactFile);
-            if (!prepared.previewMode && (phase === 'first' || phase === 'second')) {
+            if (!prepared.previewMode && (phase === 'first' || phase === 'second' || phase === 'final')) {
               // A structured agent message and the final turn result can contain
               // the same delta. Always apply against the immutable phase input so
               // a failed publication/checkpoint retry cannot double-insert it.
@@ -357,7 +357,7 @@ export class CodexLiveWorkerSupervisor {
               cwd: this.cwd,
               maxBytes: this.config.maxArtifactBytes,
             });
-            if (!prepared.previewMode && (phase === 'second' || phase === 'final')) {
+            if (!prepared.previewMode && !applied.sourceDelta && (phase === 'second' || phase === 'final')) {
               const reconciled = reconcilePublishedSourceVariants({
                 current: artifact.content,
                 candidate: fs.readFileSync(candidatePath, 'utf-8'),
@@ -403,7 +403,7 @@ export class CodexLiveWorkerSupervisor {
       outputSchema: codexWorkerOutputSchemaForPhase(
         phase,
         Number(event.count || arrivedVariants),
-        { sourceDelta: (phase === 'first' || phase === 'second') && !prepared.previewMode },
+        { sourceDelta: (phase === 'first' || phase === 'second' || phase === 'final') && !prepared.previewMode },
       ),
       onAgentMessage: publishCandidate,
       eventId: event.id,

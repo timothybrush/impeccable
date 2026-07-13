@@ -48,7 +48,7 @@ describe('transactional generation publisher', () => {
       cwd: tmp,
     });
 
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.arrivedVariants, 1);
     assert.equal(readFileSync(source, 'utf-8'), readFileSync(artifact, 'utf-8'));
     const snapshot = store.getSnapshot('abc12345');
@@ -142,6 +142,29 @@ describe('transactional generation publisher', () => {
     assert.equal(result.error, 'published_variant_changed');
     assert.equal(result.variant, 1);
     assert.equal(readFileSync(source, 'utf-8'), firstSource);
+  });
+
+  it('allows the deferred parameter manifest without weakening prior markup immutability', () => {
+    const firstSource = '<main><div data-impeccable-variants="abc12345"><style data-impeccable-css="abc12345">@scope ([data-impeccable-variant="1"]) { h1 { color: red; } }</style><div data-impeccable-variant="original">Original</div><div data-impeccable-variant="1"><h1>First</h1></div></div></main>';
+    writeFileSync(artifact, firstSource);
+    const first = publishGenerationArtifact({
+      id: 'abc12345', epoch: 1, sourceFile: source, artifactFile: artifact,
+      expectedSourceHash: sha256(readFileSync(source, 'utf-8')), arrivedVariants: 1, expectedVariants: 3, cwd: tmp,
+    });
+    assert.equal(first.ok, true);
+
+    const prepared = prepareGenerationArtifact({ id: 'abc12345', sourceFile: source, cwd: tmp });
+    const withParams = firstSource
+      .replace('<div data-impeccable-variant="1"', '<div data-impeccable-variant="1" data-impeccable-params=\'[{"id":"scale"}]\'')
+      .replace('</div></main>', '<div data-impeccable-variant="2">Second</div></div></main>');
+    writeFileSync(join(tmp, prepared.artifactFile), withParams);
+    const result = publishGenerationArtifact({
+      id: 'abc12345', epoch: prepared.epoch, sourceFile: source, artifactFile: prepared.artifactFile,
+      expectedSourceHash: prepared.expectedSourceHash, arrivedVariants: 2, expectedVariants: 3, cwd: tmp,
+    });
+
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.match(readFileSync(source, 'utf-8'), /data-impeccable-params/);
   });
 
   it('rejects later source revisions that restyle an already reviewable variant', () => {

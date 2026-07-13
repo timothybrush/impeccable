@@ -454,7 +454,6 @@ describe('Codex Live worker supervisor ownership and lifecycle', () => {
       count: 3,
       generationEpoch: 1,
     });
-    const final = '<main><div data-impeccable-variants="codexprogress"><style data-impeccable-css="codexprogress">@scope ([data-impeccable-variant="1"]) { h1 { color: red; } }\n@scope ([data-impeccable-variant="2"]) { h1 { color: green; } }\n@scope ([data-impeccable-variant="3"]) { h1 { color: blue; } }</style><div data-impeccable-variant="original"><h1>Original</h1></div><div data-impeccable-variant="1"><h1>Mutated One again</h1></div><div data-impeccable-variant="2"><h1>Mutated Two</h1></div><div data-impeccable-variant="3"><h1>Three</h1></div></div></main>';
     const client = fakeClient();
     let turn = 0;
     const prompts = [];
@@ -482,12 +481,15 @@ describe('Codex Live worker supervisor ownership and lifecycle', () => {
             },
             ...(turn === 1 ? { plan } : {}),
           })
-        : (() => {
-            const artifactPath = JSON.parse(prompt.match(/Return exactly one file whose path is ("[^"]+")/)[1]);
-            return JSON.stringify({
-              files: [{ path: artifactPath, content: final }],
-            });
-          })();
+        : JSON.stringify({
+            sourceDelta: {
+              variantId: 3,
+              markup: '<h1>Three</h1>',
+              css: '@scope ([data-impeccable-variant="3"]) { h1 { color: blue; } }',
+              parameterCss: '',
+              paramsJson: '{"1":[],"2":[],"3":[]}',
+            },
+          });
       await Promise.all([
         onAgentMessage?.(message),
         onAgentMessage?.(message),

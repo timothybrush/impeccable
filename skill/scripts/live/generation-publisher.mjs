@@ -160,7 +160,7 @@ export function publishGenerationArtifact({
         if (!currentVariant || !artifactVariant) {
           return failure('published_variant_missing', { variant });
         }
-        if (sha256(currentVariant) !== sha256(artifactVariant)) {
+        if (sha256(withoutVariantParams(currentVariant)) !== sha256(withoutVariantParams(artifactVariant))) {
           return failure('published_variant_changed', { variant });
         }
       }
@@ -520,6 +520,13 @@ function extractVariantBlock(source, variant) {
     }
   }
   return null;
+}
+
+function withoutVariantParams(block) {
+  return String(block || '').replace(
+    /\sdata-impeccable-params=(?:"[^"]*"|'[^']*')/i,
+    '',
+  );
 }
 
 function extractPreviewCss(source, id) {

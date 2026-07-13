@@ -219,6 +219,7 @@ describe('Codex Live worker structured artifact boundary', () => {
     assert.match(instructions, /shared-component visual roles/);
     assert.match(instructions, /recompose the selected element itself/);
     assert.match(instructions, /semantically unified short labels/);
+    assert.match(instructions, /fits on one line in the original/);
     assert.match(instructions, /Every variant must be independently shippable/);
     assert.match(instructions, /reject awkward label wrapping/);
     assert.match(instructions, /decorative glyphs or pseudo-content/);
@@ -242,6 +243,12 @@ describe('Codex Live worker structured artifact boundary', () => {
       codexWorkerOutputSchemaForPhase('first', 3, { sourceDelta: true }).required,
       ['sourceDelta', 'plan'],
     );
+    const finalDelta = codexWorkerOutputSchemaForPhase('final', 3, { sourceDelta: true });
+    assert.deepEqual(finalDelta.required, ['sourceDelta']);
+    assert.deepEqual(finalDelta.properties.sourceDelta.required, [
+      'variantId', 'markup', 'css', 'parameterCss', 'paramsJson',
+    ]);
+    assert.equal(finalDelta.properties.sourceDelta.properties.variantId.minimum, 3);
   });
 
   it('writes only the prepared source artifact path', () => {
@@ -492,6 +499,66 @@ describe('Codex Live worker structured artifact boundary', () => {
     assert.ok(after.indexOf('<div data-impeccable-variant="2">') < after.indexOf('impeccable-variants-end session'));
   });
 
+  it('appends the final source variant and deferred parameter manifest without rewriting prior output', () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'codex-worker-final-delta-'));
+    const artifact = path.join(cwd, 'App.jsx');
+    writeFileSync(artifact, [
+      '<main>',
+      '  <div data-impeccable-variants="session" data-impeccable-variant-count="3">',
+      '    <style data-impeccable-css="session">{`',
+      '@scope ([data-impeccable-variant="1"]) { :scope > .one { color: red; } }',
+      '@scope ([data-impeccable-variant="2"]) { :scope > .two { color: green; } }',
+      '`}</style>',
+      '    <div data-impeccable-variant="original"><article>Original</article></div>',
+      '    <div data-impeccable-variant="1"><article className="one">Immutable one</article></div>',
+      '    <div data-impeccable-variant="2"><article className="two">Immutable two</article></div>',
+      '    {/* impeccable-variants-end session */}',
+      '  </div>',
+      '</main>',
+    ].join('\n'));
+    const paramsJson = JSON.stringify({
+      1: [{ id: 'scale', kind: 'range', min: 0.8, max: 1.2, step: 0.1, default: 1, label: 'Scale' }],
+      2: [{ id: 'dense', kind: 'toggle', default: false, label: 'Dense' }],
+      3: [{
+        id: 'face',
+        kind: 'steps',
+        default: 'serif',
+        label: 'Face',
+        options: [{ value: 'serif', label: 'Serif' }, { value: 'sans', label: 'Sans' }],
+      }],
+    });
+
+    applyCodexWorkerOutput({
+      output: {
+        sourceDelta: {
+          variantId: 3,
+          markup: '<article className="three">Three</article>',
+          css: '@scope ([data-impeccable-variant="3"]) { :scope > .three { color: blue; } }',
+          parameterCss: [
+            '@scope ([data-impeccable-variant="1"]) { :scope[data-p-scale] > .one { scale: var(--p-scale); } }',
+            '@scope ([data-impeccable-variant="2"]) { :scope[data-p-dense] > .two { padding: 0; } }',
+            '@scope ([data-impeccable-variant="3"]) { :scope[data-p-face="sans"] > .three { font-family: sans-serif; } }',
+          ].join('\n'),
+          paramsJson,
+        },
+      },
+      prepared: { artifactFile: 'App.jsx' },
+      phase: 'final',
+      expectedVariants: 3,
+      sessionId: 'session',
+      scaffold: { styleMode: 'scoped' },
+      cwd,
+    });
+
+    const after = readFileSync(artifact, 'utf-8');
+    assert.match(after, /Immutable one/);
+    assert.match(after, /Immutable two/);
+    assert.match(after, /className="three">Three/);
+    assert.equal((after.match(/data-impeccable-params=/g) || []).length, 3);
+    assert.match(after, /data-p-scale/);
+    assert.ok(after.indexOf('className="three"') < after.indexOf('impeccable-variants-end session'));
+  });
+
   it('never lets a final component turn rewrite arrived variant 1', () => {
     const cwd = mkdtempSync(path.join(tmpdir(), 'codex-worker-component-'));
     const componentDir = path.join(cwd, '.impeccable/live/artifacts/session-r2-svelte');
@@ -642,6 +709,7 @@ describe('Codex Live worker structured artifact boundary', () => {
     assert.match(prompt, /keep variant 1 low-risk/);
     assert.match(prompt, /Reserve root recomposition for variant 2 or 3/);
     assert.match(prompt, /Color alone is not a sufficient primary axis/);
+    assert.match(prompt, /Every \/bolder direction must be visibly more assertive/);
     assert.match(prompt, /<main>wrapped<\/main>/);
     assert.match(prompt, /Product facts/);
     assert.match(prompt, /Design tokens/);
