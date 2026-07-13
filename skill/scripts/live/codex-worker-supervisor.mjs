@@ -340,6 +340,8 @@ export class CodexLiveWorkerSupervisor {
             prepared,
             phase,
             expectedVariants: Number(event.count || arrivedVariants),
+            sessionId: event.id,
+            scaffold: event.scaffold,
             cwd: this.cwd,
             maxBytes: this.config.maxArtifactBytes,
           });
@@ -379,7 +381,11 @@ export class CodexLiveWorkerSupervisor {
     if (this.isCanceled(event.id)) return;
     const result = await this.runTurnWithReconnect({
       input,
-      outputSchema: codexWorkerOutputSchemaForPhase(phase, Number(event.count || arrivedVariants)),
+      outputSchema: codexWorkerOutputSchemaForPhase(
+        phase,
+        Number(event.count || arrivedVariants),
+        { sourceDelta: phase === 'second' && !prepared.previewMode },
+      ),
       onAgentMessage: publishCandidate,
       eventId: event.id,
     });

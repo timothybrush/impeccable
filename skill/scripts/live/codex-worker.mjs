@@ -57,8 +57,30 @@ export const CODEX_WORKER_OUTPUT_SCHEMA = Object.freeze({
   required: ['files'],
   additionalProperties: false,
 });
+const CODEX_SOURCE_DELTA_OUTPUT_SCHEMA = Object.freeze({
+  type: 'object',
+  properties: {
+    sourceDelta: {
+      type: 'object',
+      properties: {
+        variantId: { type: 'integer', minimum: 2, maximum: 2 },
+        markup: { type: 'string', minLength: 1 },
+        css: { type: 'string', minLength: 1 },
+      },
+      required: ['variantId', 'markup', 'css'],
+      additionalProperties: false,
+    },
+  },
+  required: ['sourceDelta'],
+  additionalProperties: false,
+});
 
-export function codexWorkerOutputSchemaForPhase(phase, expectedVariants = 3) {
+export function codexWorkerOutputSchemaForPhase(
+  phase,
+  expectedVariants = 3,
+  { sourceDelta = false } = {},
+) {
+  if (sourceDelta) return CODEX_SOURCE_DELTA_OUTPUT_SCHEMA;
   const requirePlan = Number(expectedVariants) > 1 && (phase === 'first' || phase === 'atomic');
   return {
     ...CODEX_WORKER_OUTPUT_SCHEMA,
@@ -139,6 +161,7 @@ export function buildGenerationTurnInput({
   const first = phase === 'first';
   const second = phase === 'second';
   const component = Boolean(prepared.previewMode);
+  const sourceDelta = second && !component;
   const actionRules = event.action === 'bolder' && count > 1
     ? [
         'For /bolder, keep variant 1 low-risk: preserve the selected root’s high-level layout and create impact through controlled hierarchy, proportion, or rhythm. Reserve root recomposition for variant 2 or 3.',
@@ -156,7 +179,7 @@ export function buildGenerationTurnInput({
     : second
       ? [
           'Produce only variant 2 now so it can be reviewed immediately.',
-          'Variant 1 is already visible and immutable. Do not return or alter its file, markup, or CSS.',
+          'Variant 1 is already visible and immutable. Do not return or alter its markup or CSS.',
           'Follow the durable variant plan below and implement direction 2 as an independently shippable option.',
           'Defer tunable parameters: params must be absent or empty for this phase.',
         ]
@@ -175,10 +198,14 @@ export function buildGenerationTurnInput({
     `LIVE GENERATION PHASE: ${phase}`,
     ...phaseRules,
     ...actionRules,
-    component
+    sourceDelta
+      ? 'Return exactly sourceDelta for variant 2. markup is only the selected root replacement, without an outer data-impeccable wrapper. css is only the complete fenced CSS for variant 2, following event.scaffold.cssAuthoring.'
+      : component
       ? `Return staged component files relative to componentDir. Allowed variant extension: .${artifact.componentExtension}. The supervisor updates manifest.json.`
       : `Return exactly one file whose path is ${JSON.stringify(prepared.artifactFile)} and whose content is the complete staged source artifact.`,
-    component
+    sourceDelta
+      ? 'Do not repeat the staged artifact, variant 1, style tags, wrapper comments, or any data-impeccable attributes. The supervisor merges and validates this delta transactionally.'
+      : component
       ? 'For the final/atomic phase include params.json keyed by variant number. Never include manifest.json or paths outside componentDir.'
       : 'Keep the existing session wrapper and markers intact. Add only valid variant blocks and preview CSS inside that wrapper.',
     '',
@@ -267,10 +294,25 @@ export function applyCodexWorkerOutput({
   prepared,
   phase,
   expectedVariants,
+  sessionId,
+  scaffold,
   cwd = process.cwd(),
   maxBytes = 2_000_000,
 }) {
   const parsed = typeof output === 'string' ? parseWorkerJson(output) : output;
+  if (!prepared.previewMode && phase === 'second') {
+    const artifactPath = resolveInside(cwd, prepared.artifactFile);
+    if (!artifactPath) throw workerError('artifact_path_outside_project');
+    const content = applyCodexSourceDelta({
+      source: fs.readFileSync(artifactPath, 'utf-8'),
+      delta: parsed?.sourceDelta,
+      sessionId,
+      styleMode: scaffold?.styleMode || scaffold?.cssAuthoring?.mode || 'scoped',
+    });
+    if (Buffer.byteLength(content) > maxBytes) throw workerError('worker_output_too_large');
+    fs.writeFileSync(artifactPath, content, 'utf-8');
+    return { files: [prepared.artifactFile], plan: null, sourceDelta: true };
+  }
   if (!Array.isArray(parsed?.files) || parsed.files.length === 0) {
     throw workerError('worker_output_files_missing');
   }
@@ -342,6 +384,90 @@ export function applyCodexWorkerOutput({
   manifest.arrivedVariants = phase === 'first' ? 1 : phase === 'second' ? 2 : expectedVariants;
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
   return { files: [...seen], plan };
+}
+
+export function applyCodexSourceDelta({
+  source,
+  delta,
+  sessionId,
+  styleMode = 'scoped',
+}) {
+  if (!delta || typeof delta !== 'object' || Array.isArray(delta)) {
+    throw workerError('worker_output_source_delta_missing');
+  }
+  if (Number(delta.variantId) !== 2) throw workerError('worker_output_source_delta_variant_invalid');
+  const markup = String(delta.markup || '').trim();
+  const css = String(delta.css || '').trim();
+  if (!markup || !css) throw workerError('worker_output_source_delta_empty');
+  if (/data-impeccable-(?:variant|variants|css)|impeccable-variants-(?:start|end)/i.test(markup)) {
+    throw workerError('worker_output_source_delta_wrapper_forbidden');
+  }
+  if (/<\/?style\b|`|\$\{/i.test(css)) {
+    throw workerError('worker_output_source_delta_css_unsafe');
+  }
+  const cssVariantRefs = [...css.matchAll(/\[data-impeccable-variant=(?:"([^"]+)"|'([^']+)')\]/g)]
+    .map((match) => match[1] || match[2]);
+  if (cssVariantRefs.length === 0 || cssVariantRefs.some((variant) => variant !== '2')) {
+    throw workerError('worker_output_source_delta_css_unfenced');
+  }
+  const astroGlobal = styleMode === 'astro-global-prefixed';
+  if (astroGlobal ? /@scope\b/.test(css) : !/@scope\s*\(\s*\[data-impeccable-variant=(?:"2"|'2')\]\s*\)/.test(css)) {
+    throw workerError('worker_output_source_delta_css_strategy_invalid');
+  }
+
+  const id = String(sessionId || '');
+  if (!id) throw workerError('worker_output_source_delta_session_missing');
+  const wrapper = findSessionWrapper(source, id);
+  if (!wrapper) throw workerError('worker_output_source_delta_wrapper_missing');
+  if (extractSourceVariantBlock(source, 2)) throw workerError('worker_output_source_delta_variant_exists');
+
+  const escapedId = escapeRegExp(id);
+  const styleOpen = new RegExp(`<style\\b[^>]*\\bdata-impeccable-css=(?:"${escapedId}"|'${escapedId}')[^>]*>`, 'i');
+  const styleMatch = styleOpen.exec(source);
+  if (!styleMatch) throw workerError('worker_output_source_delta_style_missing');
+  const styleContentStart = styleMatch.index + styleMatch[0].length;
+  const styleClose = source.indexOf('</style>', styleContentStart);
+  if (styleClose < 0 || styleClose > wrapper.closeEnd) {
+    throw workerError('worker_output_source_delta_style_invalid');
+  }
+  const styleContent = source.slice(styleContentStart, styleClose);
+  let nextStyleContent;
+  const firstTick = styleContent.indexOf('`');
+  const lastTick = styleContent.lastIndexOf('`');
+  if (firstTick >= 0 || lastTick >= 0) {
+    if (firstTick < 0 || lastTick <= firstTick) {
+      throw workerError('worker_output_source_delta_style_invalid');
+    }
+    nextStyleContent = styleContent.slice(0, lastTick).trimEnd()
+      + '\n' + css + '\n'
+      + styleContent.slice(lastTick);
+  } else {
+    nextStyleContent = styleContent.trimEnd() + '\n' + css + '\n';
+  }
+  let merged = source.slice(0, styleContentStart) + nextStyleContent + source.slice(styleClose);
+
+  const nextWrapper = findSessionWrapper(merged, id);
+  if (!nextWrapper) throw workerError('worker_output_source_delta_wrapper_missing');
+  const closeLineStart = merged.lastIndexOf('\n', nextWrapper.closeStart) + 1;
+  const closeLinePrefix = merged.slice(closeLineStart, nextWrapper.closeStart);
+  const childIndent = nextWrapper.indent + '  ';
+  const contentIndent = childIndent + '  ';
+  const indentedMarkup = markup.split('\n')
+    .map((line) => line.trim() ? contentIndent + line : '')
+    .join('\n');
+  const variantBlock = [
+    `${childIndent}<div data-impeccable-variant="2">`,
+    indentedMarkup,
+    `${childIndent}</div>`,
+  ].join('\n');
+  if (/^\s*$/.test(closeLinePrefix)) {
+    merged = merged.slice(0, closeLineStart) + variantBlock + '\n' + merged.slice(closeLineStart);
+  } else {
+    merged = merged.slice(0, nextWrapper.closeStart)
+      + '\n' + variantBlock + '\n' + nextWrapper.indent
+      + merged.slice(nextWrapper.closeStart);
+  }
+  return merged;
 }
 
 function normalizeVariantPlan(plan, expectedVariants) {
@@ -434,6 +560,40 @@ function sanitizeEvent(event) {
   delete copy._acceptResult;
   delete copy._completionAck;
   return copy;
+}
+
+function findSessionWrapper(source, sessionId) {
+  const escapedId = escapeRegExp(sessionId);
+  const open = new RegExp(`<div\\b[^>]*\\bdata-impeccable-variants=(?:"${escapedId}"|'${escapedId}')[^>]*>`, 'i');
+  const wrapperOpen = open.exec(source);
+  if (!wrapperOpen) return null;
+  const token = /<div\b[^>]*\/\s*>|<div\b[^>]*>|<\/div\s*>/gi;
+  token.lastIndex = wrapperOpen.index;
+  let depth = 0;
+  let match;
+  while ((match = token.exec(source))) {
+    if (/^<\/div/i.test(match[0])) {
+      depth -= 1;
+      if (depth === 0) {
+        const lineStart = source.lastIndexOf('\n', wrapperOpen.index) + 1;
+        const indent = source.slice(lineStart, wrapperOpen.index).match(/^\s*/)?.[0] || '';
+        return {
+          openStart: wrapperOpen.index,
+          closeStart: match.index,
+          closeEnd: token.lastIndex,
+          indent,
+        };
+      }
+    } else if (!/\/\s*>$/.test(match[0])) {
+      depth += 1;
+    }
+  }
+  return null;
+}
+
+function extractSourceVariantBlock(source, variantId) {
+  const attr = escapeRegExp(String(variantId));
+  return new RegExp(`<div\\b[^>]*\\bdata-impeccable-variant=(?:"${attr}"|'${attr}')[^>]*>`, 'i').test(source);
 }
 
 function parseWorkerJson(value) {
