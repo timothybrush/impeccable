@@ -359,6 +359,29 @@ describe('detectUrl — browser-only fixtures', () => {
     }
   });
 
+  it('text-occlusion: box-over-text, inline padding leak, headline/card overhang flag; leading bleed, scrim, fixed bar pass', async () => {
+    const f = await detectUrl(`${baseUrl}/fixtures/antipatterns/text-occlusion.html`, { visualContrast: false });
+    const hits = f.filter(r => r.antipattern === 'text-occlusion');
+    const snippets = hits.map(h => h.snippet).join('\n');
+    assert.match(snippets, /flag-box-text/, `opaque box painted over text should flag: ${snippets}`);
+    assert.match(snippets, /flag-leak/, `inline element with leaked opaque padding should flag: ${snippets}`);
+    assert.match(snippets, /flag-headline/, `headline overhanging an opaque card should flag: ${snippets}`);
+    for (const cls of ['pass-title', 'pass-eyebrow', 'pass-hero', 'cap', 'pass-under', 'pass-fixedbar']) {
+      assert.doesNotMatch(snippets, new RegExp(cls), `".${cls}" must not flag: ${snippets}`);
+    }
+    assert.equal(hits.length, 3, `expected exactly 3 text-occlusion findings, got ${hits.length}: ${snippets}`);
+  });
+
+  it('first-viewport-column-overflow: stretched-hero column flags; balanced columns and single hero pass', async () => {
+    const f = await detectUrl(`${baseUrl}/fixtures/antipatterns/first-viewport-column-overflow.html`, { visualContrast: false });
+    const hits = f.filter(r => r.antipattern === 'first-viewport-column-overflow');
+    assert.equal(hits.length, 1, `expected exactly 1 first-viewport-column-overflow finding, got ${hits.length}: ${JSON.stringify(hits.map(h => h.snippet))}`);
+    assert.match(hits[0].snippet, /\bflag\b/, `finding must attach to the stretched-hero section: ${hits[0].snippet}`);
+    for (const cls of ['pass-balanced', 'pass-hero']) {
+      assert.doesNotMatch(hits[0].snippet, new RegExp(cls), `".${cls}" must not flag`);
+    }
+  });
+
   it('visual contrast: browser fallback catches low contrast on image backgrounds', async () => {
     const analyticOnly = await detectUrl(`${baseUrl}/fixtures/antipatterns/visual-contrast.html`, {
       waitUntil: 'load',

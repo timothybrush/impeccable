@@ -1563,6 +1563,20 @@ if (IS_BROWSER) {
       addBrowserFindings(groupMap, f.el || document.body, [{ type: f.type, detail: f.detail }]);
     }
 
+    // Text occlusion / element overlap (browser-only: needs real layout +
+    // elementFromPoint to confirm what actually paints on top)
+    const occlusionFindings = checkTextOcclusionDOM().filter(f => _ruleOk(f.type));
+    for (const f of occlusionFindings) {
+      addBrowserFindings(groupMap, f.el || document.body, [{ type: f.type, detail: f.detail }]);
+    }
+
+    // First-viewport column overflow — the stretched-hero signature
+    // (browser-only: needs real layout for the content-extent math)
+    const colOverflowFindings = checkFirstViewportColumnOverflowDOM().filter(f => _ruleOk(f.type));
+    for (const f of colOverflowFindings) {
+      addBrowserFindings(groupMap, f.el || document.body, [{ type: f.type, detail: f.detail }]);
+    }
+
     // Page-level quality checks (headings, etc.)
     const qualityFindings = checkPageQualityDOM().filter(f => _ruleOk(f.type));
     if (qualityFindings.length > 0) {

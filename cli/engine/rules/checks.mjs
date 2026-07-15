@@ -4668,6 +4668,353 @@ function checkEdgeFlushCardsDOM() {
   return findings;
 }
 
+// ---------------------------------------------------------------------------
+// Text occlusion / element overlap (browser-only)
+// ---------------------------------------------------------------------------
+
+// An opaque decorated box: a near-solid background fill or two-plus visible
+// borders make it hide whatever sits behind it. Gradient / image fills are
+// deliberately excluded — a scrim gradient over hero imagery is a contrast
+// layer, not an occluder, and belongs to the pixel low-contrast rule.
+function isOpaqueDecoratedBox(cs) {
+  if (!cs) return false;
+  const bg = parseAnyColor(cs.backgroundColor || '');
+  if (bg && (bg.a ?? 1) > 0.6) return true;
+  const borderSides = ['Top', 'Right', 'Bottom', 'Left'].filter((side) => {
+    if ((parseFloat(cs[`border${side}Width`]) || 0) <= 0) return false;
+    const bc = parseAnyColor(cs[`border${side}Color`] || '');
+    return bc && (bc.a ?? 1) > 0.3;
+  }).length;
+  return borderSides >= 2;
+}
+
+// Is this element lifted out of normal flow into a layer that can cover
+// siblings? Two normal-flow blocks stacked vertically cannot truly hide each
+// other's ink — an overlap between their rects is line-box bleed from tight
+// leading (a display headline reaching up over the line before it), not
+// occlusion. Only out-of-flow positioning (absolute / fixed / sticky) moves an
+// element off its own row onto the pixels of another; an in-place transform or
+// relative nudge on a display headline does not.
+function isLayeredElement(el) {
+  for (let cur = el; cur && cur.nodeType === 1 && cur !== document.body; cur = cur.parentElement) {
+    const pos = String(getComputedStyle(cur).position || 'static');
+    if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return true;
+  }
+  return false;
+}
+
+function elementDirectText(el) {
+  let t = '';
+  for (const node of el.childNodes || []) {
+    if (node.nodeType === 3) t += node.textContent;
+  }
+  return t.trim();
+}
+
+// Rendered gate that, unlike isRenderedForBrowserRule, does NOT exempt
+// aria-hidden subtrees: a decorative aria-hidden box still paints on screen
+// and can still visually cover real text.
+function isPaintedForOcclusion(el) {
+  for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+    const style = getComputedStyle(cur);
+    const visibility = String(style.visibility || '').toLowerCase();
+    if (style.display === 'none' || visibility === 'hidden' || visibility === 'collapse') return false;
+    if ((parseFloat(style.opacity) || 0) <= 0.05) return false;
+    if (String(style.contentVisibility || '').toLowerCase() === 'hidden') return false;
+  }
+  return true;
+}
+
+// Detects text that is actually painted UNDER an opaque box or another text
+// run (the reader can't read it), plus two structural overlap tells the
+// elementFromPoint probe can't reach: a large headline whose edge tucks behind
+// an opaque card, and an inline element whose leaked padding-box (a common
+// class-name-collision bug) covers a sibling.
+//
+// The occlusion probe is viewport-bound: elementFromPoint only answers for the
+// scan's current viewport (scroll 0), so the ground-truth paths cover the
+// first-viewport composition where collisions matter most. The inline-leak
+// path is pure geometry and runs anywhere on the page.
+const OCCLUSION_TEXT_SKIP_TAGS = new Set(['script', 'style', 'noscript', 'template', 'title']);
+
+function checkTextOcclusionDOM() {
+  const findings = [];
+  const seenVictims = new Set();
+  const vw = window.innerWidth || 1280;
+  const vh = window.innerHeight || 800;
+
+  const isFloated = (cs) => {
+    const f = String(cs.cssFloat || cs.float || 'none').toLowerCase();
+    return f === 'left' || f === 'right';
+  };
+  const isMarqueeish = (el, cs) => {
+    if (el.tagName === 'MARQUEE') return true;
+    const ident = `${el.getAttribute?.('class') || ''} ${el.getAttribute?.('id') || ''}`;
+    if (/\b(marquee|ticker|scroller|carousel|conveyor)\b/i.test(ident)) return true;
+    const anim = String(cs.animationName || '').toLowerCase();
+    return /marquee|ticker|scroll/.test(anim);
+  };
+  // A fixed or sticky overlay (status bar, toolbar, sticky header) floats above
+  // scrolling content by design — whatever sits under it at rest scrolls clear,
+  // so it is not occluding the page.
+  const isPinnedOverlay = (el) => {
+    for (let cur = el; cur && cur.nodeType === 1 && cur !== document.body; cur = cur.parentElement) {
+      const pos = String(getComputedStyle(cur).position || 'static');
+      if (pos === 'fixed' || pos === 'sticky') return true;
+    }
+    return false;
+  };
+
+  // Collect renderable text owners in / near the first viewport for the
+  // elementFromPoint probe. SVG <text> counts too.
+  const textEls = [];
+  for (const el of document.querySelectorAll('body *')) {
+    const tag = el.tagName.toLowerCase();
+    if (OCCLUSION_TEXT_SKIP_TAGS.has(tag)) continue;
+    const inSvg = !!el.closest('svg');
+    if (inSvg && tag !== 'text') continue;
+    const text = inSvg ? (el.textContent || '').trim() : elementDirectText(el);
+    if (text.length < 2) continue;
+    if (!isPaintedForOcclusion(el)) continue;
+    let rect; try { rect = el.getBoundingClientRect(); } catch { continue; }
+    if (rect.width < 6 || rect.height < 6) continue;
+    // Viewport-bound probe: keep text whose box overlaps the live viewport.
+    if (rect.bottom <= 0 || rect.top >= vh) continue;
+    textEls.push({ el, rect, text, inSvg });
+  }
+
+  for (const victim of textEls) {
+    const { el, rect, text } = victim;
+    if (seenVictims.has(el)) continue;
+    const style = getComputedStyle(el);
+    if (isScreenReaderOnlyTextStyle(style, { width: rect.width, height: rect.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight })) continue;
+
+    const cols = Math.max(6, Math.min(30, Math.round(rect.width / 12)));
+    const rows = Math.max(1, Math.min(4, Math.round(rect.height / 14)));
+    let total = 0;
+    let occluded = 0;
+    let occluderEl = null;
+    let occluderKind = '';
+    for (let i = 0; i < cols; i++) {
+      const x = rect.left + rect.width * ((i + 0.5) / cols);
+      if (x < 1 || x > vw - 1) continue;
+      for (let j = 0; j < rows; j++) {
+        const y = rect.top + rect.height * ((j + 0.5) / rows);
+        if (y < 1 || y > vh - 1) continue;
+        total++;
+        const top = document.elementFromPoint(x, y);
+        if (!top) continue;
+        // Text visible here: the probe returns the text itself, a descendant,
+        // or one of its ancestors (the text's own container / background).
+        if (top === el || el.contains(top) || top.contains(el)) continue;
+        const topCs = getComputedStyle(top);
+        if (isFloated(topCs) || isMarqueeish(top, topCs) || isPinnedOverlay(top)) continue;
+        const topTag = top.tagName.toLowerCase();
+        // Text sitting under a raw image/video is contrast territory (deduped
+        // against the pixel low-contrast rule); leave those alone here.
+        if (['img', 'video', 'canvas', 'picture'].includes(topTag)) continue;
+        const topHasText = elementDirectText(top).length > 0 || !!top.closest('svg');
+        if (isOpaqueDecoratedBox(topCs)) {
+          occluded++;
+          if (!occluderEl) { occluderEl = top; occluderKind = 'box'; }
+        } else if (topHasText) {
+          occluded++;
+          if (!occluderEl) { occluderEl = top; occluderKind = 'text'; }
+        }
+      }
+    }
+    if (total === 0 || !occluderEl) continue;
+    const occFrac = occluded / total;
+    // A solid box's paint fills its rect, so box coverage is real at a lower
+    // bar. Text coverage rides on elementFromPoint returning the occluder's box
+    // (line box / container), which can exceed its actual glyph ink, so the
+    // text bar is higher — partial overlaps below it are crowding, not burial.
+    if (occFrac < (occluderKind === 'text' ? 0.45 : 0.3)) continue;
+
+    // (i) Substantial occlusion: a real slab of the text is behind something.
+    if (occluderKind === 'text') {
+      // Two SVG texts inside the same emblem (concentric arcs, monogram) are one
+      // decorative unit, not a collision.
+      const victimSvg = el.closest('svg');
+      const occSvg = occluderEl.closest('svg');
+      if (victimSvg && occSvg && victimSvg === occSvg) continue;
+      // Both sides in plain flow: the overlap is line-box bleed from tight
+      // leading (a big headline reaching up over its own eyebrow), not one text
+      // run painted over another.
+      if (!isLayeredElement(el) && !isLayeredElement(occluderEl)) continue;
+    }
+    seenVictims.add(el);
+    findings.push({
+      el,
+      type: 'text-occlusion',
+      detail: `${classSelector(el)} "${text.slice(0, 24)}" is ${Math.round(occFrac * 100)}% covered by ${occluderKind === 'text' ? 'overlapping text' : 'an opaque element'} (${classSelector(occluderEl)})`,
+    });
+  }
+
+  // (ii) Headline overhanging an opaque card: a display-scale line whose bulk
+  // sits outside a bounded content card but whose edge clips into it. The text
+  // may still paint on top and stay readable, but the two layers were dropped
+  // on the same pixels — a placement collision, not a composition.
+  const cards = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (el.closest('svg')) continue;
+    if (!isPaintedForOcclusion(el)) continue;
+    const cs = getComputedStyle(el);
+    const bg = parseAnyColor(cs.backgroundColor || '');
+    const bgImg = cs.backgroundImage || '';
+    if (!bg || (bg.a ?? 1) <= 0.7) continue;
+    if (bgImg && bgImg !== 'none' && /(gradient|url)\(/i.test(bgImg)) continue;
+    const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some((s) => (parseFloat(cs[`border${s}Width`]) || 0) > 0);
+    const hasShadow = cs.boxShadow && cs.boxShadow !== 'none';
+    if (!hasBorder && !hasShadow) continue;
+    if (isPinnedOverlay(el)) continue;
+    let cr; try { cr = el.getBoundingClientRect(); } catch { continue; }
+    if (cr.width < 100 || cr.width > 0.8 * vw || cr.height < 60) continue;
+    cards.push({ el, rect: cr });
+  }
+  for (const victim of textEls) {
+    const { el, rect, text } = victim;
+    if (seenVictims.has(el)) continue;
+    const style = getComputedStyle(el);
+    if ((parseFloat(style.fontSize) || 16) < 40) continue;
+    let lineHeight = parseFloat(style.lineHeight);
+    if (!Number.isFinite(lineHeight)) lineHeight = (parseFloat(style.fontSize) || 16) * 1.2;
+    const centerX = rect.left + rect.width / 2;
+    for (const card of cards) {
+      if (card.el === el || el.contains(card.el) || card.el.contains(el)) continue;
+      const ix = Math.max(0, Math.min(rect.right, card.rect.right) - Math.max(rect.left, card.rect.left));
+      const iy = Math.max(0, Math.min(rect.bottom, card.rect.bottom) - Math.max(rect.top, card.rect.top));
+      if (ix < 8 || iy < 0.5 * lineHeight) continue;
+      // The headline's bulk must sit outside the card — only its edge clips in.
+      if (centerX >= card.rect.left && centerX <= card.rect.right) continue;
+      if (ix > 0.5 * rect.width) continue;
+      seenVictims.add(el);
+      findings.push({
+        el,
+        type: 'text-occlusion',
+        detail: `${classSelector(el)} "${text.slice(0, 24)}" overhangs ${classSelector(card.el)} by ${Math.round(ix)}px — the headline and the card collide`,
+      });
+      break;
+    }
+  }
+
+  // (iii) Inline padding leak: an inline element with an opaque background and
+  // large vertical padding paints a filled block whose padding-box overflows
+  // its line (inline padding reserves no vertical space), so the fill lands on
+  // the content above and below instead of enclosing its own text. The
+  // canonical bug is a class-name collision that hands a decorative marker a
+  // payoff card's padding. The tell is a rendered height several times the line
+  // height, which distinguishes the leak from a padded inline highlight.
+  for (const el of document.querySelectorAll('body *')) {
+    if (el.closest('svg')) continue;
+    if (!isPaintedForOcclusion(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display !== 'inline') continue;
+    const bg = parseAnyColor(cs.backgroundColor || '');
+    if (!bg || (bg.a ?? 1) <= 0.6) continue;
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    if (padTop + padBottom < 24) continue;
+    let rect; try { rect = el.getBoundingClientRect(); } catch { continue; }
+    if (rect.width < 12 || rect.height < 24) continue;
+    const fontSize = parseFloat(cs.fontSize) || 16;
+    let lineHeight = parseFloat(cs.lineHeight);
+    if (!Number.isFinite(lineHeight)) lineHeight = fontSize * 1.4;
+    // The padding box has to overflow the line by a clear margin — a padded
+    // inline highlight sits at roughly one line height, the leak at several.
+    if (rect.height < 2.2 * lineHeight) continue;
+    if (seenVictims.has(el)) continue;
+    // Name a neighbour the fill lands on, if one is nearby (paint state aside,
+    // reveal-on-scroll siblings still occupy the space it covers).
+    let overlaps = null;
+    for (const other of el.parentElement ? el.parentElement.children : []) {
+      if (other === el || el.contains(other) || other.contains(el)) continue;
+      if (getComputedStyle(other).display === 'none') continue;
+      const oRect = other.getBoundingClientRect();
+      const ix = Math.max(0, Math.min(rect.right, oRect.right) - Math.max(rect.left, oRect.left));
+      const iy = Math.max(0, Math.min(rect.bottom, oRect.bottom) - Math.max(rect.top, oRect.top));
+      if (ix > 4 && iy > 4 && (other.textContent || '').trim().length > 0) { overlaps = other; break; }
+    }
+    seenVictims.add(el);
+    findings.push({
+      el,
+      type: 'text-occlusion',
+      detail: `${classSelector(el)} is an inline element whose opaque fill leaks ${Math.round(rect.height)}px past its line${overlaps ? ` onto ${classSelector(overlaps)}` : ''}`,
+    });
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// First-viewport column overflow — the stretched-hero signature (browser-only)
+// ---------------------------------------------------------------------------
+
+// A multi-column composition that opens the page (grid/flex with two or more
+// side-by-side columns, each a real share of the width) where one column's
+// content runs far past the fold while its sibling fits inside a single
+// viewport. The row stretches to the tall column, so the short one floats in a
+// screen-and-a-half of dead space and the fold falls deep inside a single
+// section. Single-column pages and full-page heroes (no sibling column) are
+// exempt because there is no fitting sibling to contrast against.
+function checkFirstViewportColumnOverflowDOM() {
+  const findings = [];
+  const vw = window.innerWidth || 1280;
+  const vh = window.innerHeight || 800;
+  const isMultiCol = (s) => /(^|inline-)(grid|flex)$/.test(String(s.display || ''));
+
+  for (const el of document.querySelectorAll('body *')) {
+    const style = getComputedStyle(el);
+    if (!isMultiCol(style)) continue;
+    let rect; try { rect = el.getBoundingClientRect(); } catch { continue; }
+    if (rect.width < 0.5 * vw) continue;
+    const pageTop = rect.top + (window.scrollY || 0);
+    const pageBottom = pageTop + rect.height;
+    // The fold must fall inside this container: it opens within the first
+    // viewport and runs past it.
+    if (pageTop >= vh * 0.9 || pageBottom <= vh) continue;
+
+    // Direct children that read as side-by-side columns: a real width share,
+    // not full-bleed (stacked single column), sharing the container's top row.
+    const cols = [];
+    for (const child of el.children) {
+      const cs = getComputedStyle(child);
+      if (cs.display === 'none') continue;
+      if (String(cs.position || '') === 'absolute' || String(cs.position || '') === 'fixed') continue;
+      let cr; try { cr = child.getBoundingClientRect(); } catch { continue; }
+      const wShare = cr.width / rect.width;
+      if (wShare < 0.25 || wShare > 0.9) continue;
+      if (cr.height < 40) continue;
+      // Content extent: how far the child's own content actually reaches,
+      // independent of a stretched row height.
+      let contentBottom = cr.top;
+      for (const d of child.querySelectorAll('*')) {
+        const ds = getComputedStyle(d);
+        if (ds.position === 'absolute' || ds.position === 'fixed') continue;
+        if (ds.display === 'none' || ds.visibility === 'hidden') continue;
+        let dr; try { dr = d.getBoundingClientRect(); } catch { continue; }
+        if (dr.width > 0 && dr.height > 0) contentBottom = Math.max(contentBottom, dr.bottom);
+      }
+      cols.push({ child, top: cr.top, contentH: contentBottom - cr.top });
+    }
+    if (cols.length < 2) continue;
+    // Side-by-side: the two candidate columns must share the top row.
+    cols.sort((a, b) => b.contentH - a.contentH);
+    const tall = cols[0];
+    const shortest = cols[cols.length - 1];
+    if (Math.abs(tall.top - shortest.top) > 0.25 * vh) continue;
+    if (tall.contentH <= vh * 1.4) continue;
+    if (shortest.contentH > vh) continue;
+
+    findings.push({
+      el,
+      type: 'first-viewport-column-overflow',
+      detail: `${classSelector(el)} opens the page with one column running ${Math.round(tall.contentH / vh * 100)}% of the viewport tall while a sibling fits in ${Math.round(shortest.contentH / vh * 100)}% — the fold falls deep inside the section`,
+    });
+  }
+  return findings;
+}
+
 export {
   checkBorders,
   isEmojiOnlyText,
@@ -4769,4 +5116,8 @@ export {
   measureHiddenTextDOM,
   checkContentHiddenAtRest,
   checkEdgeFlushCardsDOM,
+  isOpaqueDecoratedBox,
+  isLayeredElement,
+  checkTextOcclusionDOM,
+  checkFirstViewportColumnOverflowDOM,
 };

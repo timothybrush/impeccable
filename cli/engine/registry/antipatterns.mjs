@@ -305,6 +305,24 @@ const ANTIPATTERNS = [
       'Cards inside a horizontal scroller or tab panel sit flush against the container edge at rest while keeping a gutter on the other side, so their edges and rounded corners get cut off. Usually the panel is sized wider than its clip box. Keep a consistent inset on both sides.',
   },
   {
+    id: 'text-occlusion',
+    category: 'quality',
+    scopes: ['layout'],
+    name: 'Text occluded by an overlapping element',
+    description:
+      'Text is painted under an opaque element or a second text run, so part of it cannot be read. A decorative box, a stacked layer, or an inline element with leaked padding lands on the words instead of beside them. Give overlapping layers room, or move the text out from under the layer above it.',
+    skillSection: 'Layout & Space',
+  },
+  {
+    id: 'first-viewport-column-overflow',
+    category: 'quality',
+    scopes: ['layout'],
+    name: 'One column stretches the first viewport',
+    description:
+      'A multi-column opening section lets one column run far past the fold while its sibling fits in a single viewport, so the short column floats in dead space and the fold falls deep inside one section. Balance the columns, cap the tall one, or let the long content flow below the opening row.',
+    skillSection: 'Layout & Space',
+  },
+  {
     id: 'gray-on-color',
     category: 'quality',
     name: 'Gray text on colored background',
