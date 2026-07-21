@@ -54,6 +54,7 @@ export const SUITES = {
           'tests/ci-test-plan.test.mjs',
           'tests/cli-args.test.mjs',
           'tests/concept-seed.test.mjs',
+          'tests/serve-question.test.mjs',
           'tests/context.test.mjs',
           'tests/context-signals.test.mjs',
           'tests/critique-storage.test.mjs',
