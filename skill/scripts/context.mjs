@@ -1127,6 +1127,7 @@ async function cli() {
     appendSurfaceBriefContext(parts, ctx);
     parts.push(buildResolvedContextDirective(ctx, cliOptions, { targetExists }));
     appendDetectorFallback(parts, ctx);
+    appendImageGenDirective(parts);
     if (shouldWarnMissingTarget(ctx, targetProvided, targetExists)) {
       parts.push(buildMissingTargetDirective());
     }
@@ -1141,6 +1142,7 @@ async function cli() {
   appendSurfaceBriefContext(parts, ctx);
   parts.push(buildResolvedContextDirective(ctx, cliOptions, { targetExists }));
   appendDetectorFallback(parts, ctx);
+  appendImageGenDirective(parts);
   if (shouldWarnMissingTarget(ctx, targetProvided, targetExists)) {
     parts.push(buildMissingTargetDirective());
   }
@@ -1241,6 +1243,20 @@ function automaticHookMode(ctx) {
     }
   }
   return 'none';
+}
+
+
+// Image generation availability: harness-native tools always win, but when the
+// environment carries an OpenAI key the API fallback works everywhere. The
+// flag only reports capability; generate-image.mjs states cost before use.
+function appendImageGenDirective(parts) {
+  if (!process.env.OPENAI_API_KEY) return;
+  const scriptsPath = path.dirname(fileURLToPath(import.meta.url));
+  parts.push([
+    'IMAGE_GEN_AVAILABLE: An OpenAI key is present, so image generation works even without a harness-native image tool:',
+    `\`node ${scriptsPath}/generate-image.mjs --prompt "..." --out <file>\` (gpt-image-2, billed to the user's key; say so before the first render).`,
+    'Prefer the harness-native image tool when one exists. Visualizing a direction before building it measurably strengthens the result.',
+  ].join(' '));
 }
 
 // reference/craft-floor.md carries the detector-blind reflexes on every build,
