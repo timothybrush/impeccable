@@ -9,7 +9,7 @@ import {
   validateConceptEntry,
 } from '../skill/scripts/lib/concept-catalog.mjs';
 import { readCompositionCatalog } from '../skill/scripts/lib/composition-catalog.mjs';
-import { renderChallenger, selectApprovedChallengers, selectApprovedStaging } from '../skill/scripts/concept-seed.mjs';
+import { renderChallenger, selectApprovedChallengers, selectApprovedStaging, selectApprovedStagings } from '../skill/scripts/concept-seed.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = path.join(ROOT, 'skill', 'scripts', 'concept-seed.mjs');
@@ -101,6 +101,20 @@ describe('concept seed scopes', () => {
     assert.match(rendered.stdout, /mode: experience/);
     assert.match(rendered.stdout, /--scope direction --mode experience --from stable-test/);
     assert.match(rendered.stdout, /FIRST-SURFACE STAGING/);
+  });
+
+  it('draws several staging inputs from distinct families when the approved pool allows it', () => {
+    const pool = [
+      { id: 'a', familyId: 'first', surface: 'persuade', status: 'approved' },
+      { id: 'b', familyId: 'scroll', surface: 'persuade', status: 'approved' },
+      { id: 'c', familyId: 'physics', surface: 'persuade', status: 'approved' },
+      { id: 'd', familyId: 'first', surface: 'persuade', status: 'approved' },
+      { id: 'e', familyId: 'other', surface: 'operate', status: 'approved' },
+    ];
+    const picks = selectApprovedStagings({ scope: 'direction', key: 'several', mode: 'persuade', sourceCompositions: pool });
+    assert.equal(picks.length, 3);
+    assert.equal(new Set(picks.map(pick => pick.familyId)).size, 3);
+    assert.equal(picks.every(pick => pick.surface === 'persuade'), true);
   });
 
   it('validates the fixture catalog with the real gates', () => {

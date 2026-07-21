@@ -163,39 +163,60 @@ ${system}
      WEB LEVERAGE: ${concept.webLeverage}`;
 }
 
-export function renderStaging(composition) {
+export function renderStaging(composition, index = null) {
   const grammar = composition.grammar.map(rule => `       - ${rule}`).join('\n');
-  return `  ${composition.form}
+  return `  ${index == null ? '' : `${index + 1}. `}${composition.form}
      SPARK: ${composition.spark}
      STAGING GRAMMAR:
 ${grammar}
      WEB LEVERAGE: ${composition.webLeverage}`;
 }
 
-// One approved staging from the composition catalog, rolled deterministically.
-// Returns null while the composition pool has no approved entry for the
-// requested mode. Cross-mode fallback would turn an absent staging into a
-// misleading one. A re-roll excludes earlier stagings until the pool runs out.
-export function selectApprovedStaging({ scope, key, reroll = 0, mode = null, sourceCompositions = null }) {
+// Three approved, identity-free staging inputs are rolled deterministically.
+// One input was too weak a counterweight to a model's habitual page skeleton:
+// it became a single optional flourish beside six identity challengers rather
+// than a real search over composition. Prefer distinct staging families so a
+// roll tests materially different hierarchy, sequence, and interaction laws.
+// Cross-mode fallback would make the input misleading, so an absent mode still
+// returns no staging. Re-rolls exclude every earlier set until the pool runs out.
+export function selectApprovedStagings({ scope, key, reroll = 0, mode = null, sourceCompositions = null, count = 3 }) {
   const pool = sourceCompositions ?? requireLocalConcepts().compositions;
   let approved = pool.filter(composition => composition.status === 'approved');
-  if (approved.length === 0) return null;
+  if (approved.length === 0) return [];
   if (mode) {
     const matching = approved.filter(composition => composition.surface === mode);
-    if (matching.length === 0) return null;
+    if (matching.length === 0) return [];
     approved = matching;
   }
   const prior = new Set();
-  let pick = deterministicRank(approved, `${scope}:${key}:staging`)[0];
-  for (let round = 1; round <= reroll; round += 1) {
-    prior.add(pick.id);
-    const pool = approved.filter(composition => !prior.has(composition.id));
-    pick = deterministicRank(
-      pool.length > 0 ? pool : approved,
-      `${scope}:${key}:staging:reroll-${round}`
-    )[0];
+  let picks = [];
+  for (let round = 0; round <= reroll; round += 1) {
+    const available = approved.filter(composition => !prior.has(composition.id));
+    const ranked = deterministicRank(
+      available.length >= Math.min(count, approved.length) ? available : approved,
+      round === 0 ? `${scope}:${key}:staging` : `${scope}:${key}:staging:reroll-${round}`
+    );
+    const families = new Set();
+    picks = [];
+    for (const composition of ranked) {
+      const family = composition.familyId ?? composition.id;
+      if (families.has(family)) continue;
+      picks.push(composition);
+      families.add(family);
+      if (picks.length >= count) break;
+    }
+    for (const composition of ranked) {
+      if (picks.length >= count) break;
+      if (!picks.some(pick => pick.id === composition.id)) picks.push(composition);
+    }
+    if (round < reroll) picks.forEach(composition => prior.add(composition.id));
   }
-  return pick;
+  return picks;
+}
+
+// Compatibility for callers that need a single smoke-test sample.
+export function selectApprovedStaging(options) {
+  return selectApprovedStagings({ ...options, count: 1 })[0] ?? null;
 }
 
 export function selectApprovedChallengers({ scope, key, reroll = 0, sourceConcepts = null }) {
@@ -326,7 +347,7 @@ export function renderConceptSeed({
         approvedCount: approved.length,
         catalogCount,
         challengers: picks,
-        staging: selectApprovedStaging({ scope, key, reroll, mode, sourceCompositions: local.compositions }),
+        stagings: selectApprovedStagings({ scope, key, reroll, mode, sourceCompositions: local.compositions }),
       };
     } else {
       // Keep local renders synchronous for prepared eval sessions and tests;
@@ -343,7 +364,7 @@ export function renderConceptSeed({
           approvedCount: roll.approvedCount,
           catalogCount: roll.catalogCount,
           challengers: roll.challengers,
-          staging: roll.staging,
+          stagings: Array.isArray(roll.stagings) ? roll.stagings : roll.staging ? [roll.staging] : [],
         } : null,
       }));
     }
@@ -418,12 +439,15 @@ A user- or brief-pinned decision beats the roll, always.
 `;
   }
 
-  const stagingBlock = data.staging
-    ? `\n${scope === 'direction' ? 'FIRST-SURFACE STAGING (identity-free; pair it with the chosen world and judge the pair as one decision):' : 'STAGING CHALLENGER (identity-free; dress it in the committed visual identity before judging):'}
-${renderStaging(data.staging)}
-A staging organizes attention, sequence, and manipulation; it never brings a
-palette, typeface, or material. It competes on structure alone and loses to a
-grounded structure that fits the product better.\n`
+  const stagings = Array.isArray(data.stagings)
+    ? data.stagings
+    : data.staging ? [data.staging] : [];
+  const stagingBlock = stagings.length > 0
+    ? `\n${scope === 'direction' ? 'FIRST-SURFACE STAGING INPUTS (identity-free; test them with shortlisted worlds and keep world plus staging one decision):' : 'STAGING CHALLENGERS (identity-free; dress them in the committed visual identity before judging):'}
+${stagings.map((staging, index) => renderStaging(staging, index)).join('\n')}
+Stagings organize attention, sequence, and manipulation; they never bring a
+palette, typeface, or material. Use them as serious alternatives to the model's
+habitual composition, but keep only structures that strengthen this product.\n`
     : '';
   const rerollBlock = reroll > 0
     ? `RE-ROLL ROUND ${reroll}: every candidate presented in earlier rounds, grounded
