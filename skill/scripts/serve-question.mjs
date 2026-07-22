@@ -171,12 +171,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 function page() {
   const cards = options.map((option, index) => `
-    <article class="card${index === 0 ? ' lead' : ''}" data-id="${esc(option.id)}">
+    <article class="card${index === 0 ? ' lead' : ''}" style="--fan:${index === 0 ? '0deg' : (index % 2 ? '1.4deg' : '-1.2deg')};--deal:${index * 90}ms" data-id="${esc(option.id)}">
       ${option.kicker ? `<span class="kicker">${esc(option.kicker)}</span>` : ''}
       ${option.heroSrc ? `<img class="hero" src="${esc(option.heroSrc)}" alt="">` : '<div class="hero hero-blank"></div>'}
       <div class="body">
+        ${option.lineage ? `<p class="tier">${esc(option.lineage)}</p>` : ''}
         <h2>${esc(option.label)}</h2>
-        ${option.lineage ? `<p class="lineage">${esc(option.lineage)}</p>` : ''}
         ${option.body ? `<p class="detail">${esc(option.body)}</p>` : ''}
         ${option.boardSrc ? `<details><summary>design-system board</summary><img src="${esc(option.boardSrc)}" alt=""></details>` : ''}
         <button class="choose" data-id="${esc(option.id)}">Build this</button>
@@ -185,49 +185,86 @@ function page() {
   return `<!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(payload.title || 'impeccable · decision')}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=Alumni+Sans:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
+  /* Neo kinpaku tokens, mirrored from impeccable.style kinpaku-tokens.css */
+  :root {
+    color-scheme: dark;
+    --ks-kinpaku: oklch(84% 0.19 80.46);
+    --ks-kinpaku-rich: oklch(77% 0.13 82);
+    --ks-kinpaku-deep: oklch(61% 0.085 78);
+    --ks-dark-ink: oklch(14% 0.018 95);
+    --ks-patina: oklch(70% 0.12 188);
+    --ks-lacquer: oklch(7% 0.006 95);
+    --ks-lacquer-raised: oklch(11% 0.006 95);
+    --ks-graphite: oklch(15% 0.008 95);
+    --ks-graphite-2: oklch(19% 0.008 95);
+    --ks-champagne: oklch(91% 0 0);
+    --ks-text: oklch(88% 0 0);
+    --ks-text-muted: oklch(72% 0 0);
+    --ks-text-faint: oklch(62% 0 0);
+    --ks-rule: oklch(78% 0 0 / 0.16);
+    --ks-font-display: "Alumni Sans", "Albert Sans", Arial, sans-serif;
+    --ks-font: "Albert Sans", "Avenir Next", "Helvetica Neue", Arial, system-ui, sans-serif;
+    --ks-mono: "SFMono-Regular", "Roboto Mono", "JetBrains Mono", Consolas, monospace;
+  }
   * { box-sizing: border-box; margin: 0; }
-  body { background: #0c0b09; color: #efe9dc; font: 15px/1.55 ui-sans-serif, system-ui, sans-serif; padding: 3rem clamp(1rem, 5vw, 4rem); }
-  header { max-width: 68rem; margin: 0 auto 2.5rem; }
-  header .mark { color: #c8a24a; font-weight: 700; letter-spacing: .18em; font-size: .72rem; text-transform: uppercase; }
-  h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); line-height: 1.15; margin-top: .6rem; }
-  .question { color: #b7ad99; margin-top: .7rem; max-width: 48rem; }
-  .grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr)); max-width: 90rem; margin: 0 auto; }
-  .card { background: #14120e; border: 1px solid #2a261e; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
-  .card.lead { border-color: #c8a24a; box-shadow: 0 1px 0 #c8a24a inset; }
-  .kicker { position: absolute; margin: .8rem; background: #c8a24a; color: #14120e; font-size: .68rem; font-weight: 700; letter-spacing: .14em; padding: .25rem .6rem; border-radius: 3px; }
-  .card { position: relative; }
-  img.hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #1b1812; }
-  .hero-blank { width: 100%; aspect-ratio: 16/9; background: repeating-linear-gradient(135deg, #17140f 0 14px, #14120e 14px 28px); }
-  .body { padding: 1.1rem 1.2rem 1.3rem; display: flex; flex-direction: column; gap: .55rem; flex: 1; }
-  h2 { font-size: 1.12rem; }
-  .lineage { color: #c8a24a; font-size: .8rem; letter-spacing: .04em; }
-  .detail { color: #b7ad99; font-size: .88rem; white-space: pre-wrap; }
-  details { font-size: .8rem; color: #b7ad99; } details img { width: 100%; margin-top: .5rem; border-radius: 6px; }
-  button.choose { margin-top: auto; align-self: start; background: #efe9dc; color: #14120e; border: 0; font: inherit; font-weight: 650; padding: .55rem 1.1rem; border-radius: 6px; cursor: pointer; }
-  button.choose:hover { background: #c8a24a; }
-  footer { max-width: 68rem; margin: 2.2rem auto 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-  #steer { flex: 1; min-width: 16rem; background: #14120e; color: #efe9dc; border: 1px solid #2a261e; border-radius: 6px; padding: .55rem .8rem; font: inherit; }
-  #reroll { background: none; border: 1px solid #2a261e; color: #b7ad99; font: inherit; padding: .55rem 1.1rem; border-radius: 6px; cursor: pointer; }
-  #reroll:hover { border-color: #c8a24a; color: #c8a24a; }
-  .done { text-align: center; padding: 6rem 1rem; font-size: 1.2rem; }
+  body { background: var(--ks-lacquer); color: var(--ks-text); font: 15px/1.55 var(--ks-font); padding: 2.6rem clamp(1rem, 5vw, 4rem) 4rem; }
+  header { max-width: 74rem; margin: 0 auto 2.4rem; }
+  .brand { display: flex; align-items: center; gap: .55rem; }
+  .brand svg { width: 26px; height: 26px; }
+  .brand svg path { fill: var(--ks-kinpaku); }
+  .wordmark { font-family: var(--ks-font-display); font-weight: 600; font-size: 1.35rem; letter-spacing: .012em; color: var(--ks-kinpaku); }
+  .headline { display: flex; align-items: center; gap: 1.1rem; margin-top: 1.6rem; }
+  .die { flex: none; display: flex; align-items: center; justify-content: center; min-width: 56px; height: 56px; font-family: var(--ks-font-display); font-size: 2.1rem; font-weight: 700; color: var(--ks-dark-ink); background: var(--ks-kinpaku); border-radius: 10px; transform: rotate(3deg); box-shadow: 0 10px 26px oklch(0% 0 0 / 0.45); }
+  h1 { font-family: var(--ks-font-display); font-weight: 700; font-size: clamp(1.7rem, 3.4vw, 2.5rem); line-height: 1.05; color: var(--ks-champagne); }
+  .question { color: var(--ks-text-muted); margin-top: .85rem; max-width: 52rem; }
+  .grid { display: grid; gap: 1.6rem; grid-template-columns: repeat(auto-fit, minmax(min(23rem, 100%), 1fr)); max-width: 90rem; margin: 0 auto; }
+  .card { position: relative; overflow: hidden; background: var(--ks-lacquer-raised); border: 1px solid var(--ks-rule); border-radius: 10px; box-shadow: 0 18px 40px oklch(0% 0 0 / 0.35); transform: rotate(var(--fan, 0deg)); display: flex; flex-direction: column; opacity: 0; animation: deal .5s cubic-bezier(.16, 1, .3, 1) forwards; animation-delay: var(--deal, 0ms); transition: transform .25s cubic-bezier(.16, 1, .3, 1), border-color .25s; }
+  .card:hover { transform: rotate(0deg) translateY(-4px); border-color: var(--ks-kinpaku-deep); }
+  .card.lead { border-color: var(--ks-kinpaku-deep); box-shadow: 0 0 0 1px var(--ks-kinpaku-deep), 0 18px 40px oklch(0% 0 0 / 0.45); }
+  @keyframes deal { from { opacity: 0; transform: translateY(26px) rotate(calc(var(--fan, 0deg) + 2deg)); } to { opacity: 1; transform: translateY(0) rotate(var(--fan, 0deg)); } }
+  @media (prefers-reduced-motion: reduce) { .card { animation: none; opacity: 1; } }
+  .kicker { position: absolute; z-index: 1; top: .8rem; left: .8rem; display: flex; align-items: center; justify-content: center; padding: .3rem .55rem; background: var(--ks-kinpaku); color: var(--ks-dark-ink); font-family: var(--ks-font-display); font-size: .78rem; font-weight: 700; letter-spacing: .14em; border-radius: 6px; transform: rotate(-3deg); box-shadow: 0 6px 16px oklch(0% 0 0 / 0.4); }
+  img.hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: linear-gradient(100deg, var(--ks-graphite) 40%, var(--ks-graphite-2) 50%, var(--ks-graphite) 60%); }
+  .hero-blank { width: 100%; aspect-ratio: 16/9; background: linear-gradient(100deg, var(--ks-graphite) 40%, var(--ks-graphite-2) 50%, var(--ks-graphite) 60%); }
+  .body { padding: .95rem 1.1rem 1.2rem; display: flex; flex-direction: column; gap: .5rem; flex: 1; }
+  .tier { font-family: var(--ks-mono); font-size: .625rem; letter-spacing: .24em; text-transform: uppercase; color: var(--ks-text-faint); }
+  h2 { font-family: var(--ks-font-display); font-size: 1.35rem; font-weight: 600; line-height: 1.15; letter-spacing: .01em; color: var(--ks-champagne); }
+  .detail { color: var(--ks-text-muted); font-size: .88rem; white-space: pre-wrap; }
+  details { font-size: .78rem; color: var(--ks-text-faint); } details summary { cursor: pointer; } details img { width: 100%; margin-top: .5rem; border-radius: 6px; border: 1px solid var(--ks-rule); }
+  button.choose { margin-top: auto; align-self: start; background: var(--ks-kinpaku); color: var(--ks-dark-ink); border: 0; font-family: var(--ks-font); font-size: .9rem; font-weight: 650; padding: .55rem 1.15rem; border-radius: 7px; cursor: pointer; transition: background .15s; }
+  button.choose:hover { background: var(--ks-kinpaku-rich); }
+  footer { max-width: 74rem; margin: 2.4rem auto 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  #steer { flex: 1; min-width: 16rem; background: var(--ks-lacquer-raised); color: var(--ks-text); border: 1px solid var(--ks-rule); border-radius: 7px; padding: .6rem .85rem; font: inherit; }
+  #steer:focus { outline: none; border-color: var(--ks-patina); }
+  #reroll { display: flex; align-items: center; gap: .5rem; background: none; border: 1px solid var(--ks-kinpaku-deep); color: var(--ks-kinpaku); font-family: var(--ks-font-display); font-weight: 600; font-size: .95rem; padding: .55rem 1.15rem; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
+  #reroll:hover { background: var(--ks-kinpaku); color: var(--ks-dark-ink); }
+  .done { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 7rem 1rem; font-family: var(--ks-font-display); font-size: 1.4rem; color: var(--ks-champagne); text-align: center; }
 </style>
 <header>
-  <div class="mark">impeccable</div>
-  <h1>${esc(payload.title || 'Choose a direction')}</h1>
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 1 L18 1 L8 31 L7 31 Q1 31 1 25 L1 7 Q1 1 7 1 Z"/><path d="M22 1 L25 1 Q31 1 31 7 L31 25 Q31 31 25 31 L12 31 Z"/></svg>
+    <span class="wordmark">impeccable</span>
+  </div>
+  <div class="headline">
+    <div class="die">${options.length}</div>
+    <h1>${esc(payload.title || 'Choose a direction')}</h1>
+  </div>
   ${payload.question ? `<p class="question">${esc(payload.question)}</p>` : ''}
 </header>
 <main class="grid">${cards}</main>
 <footer>
   ${payload.steer ? '<input id="steer" placeholder="Optional steer: what should be different or kept?">' : ''}
-  ${payload.reroll ? '<button id="reroll">Re-roll: none of these</button>' : ''}
+  ${payload.reroll ? '<button id="reroll"><span>&#9860;</span> Re-roll: none of these</button>' : ''}
 </footer>
 <script>
   const steer = () => document.getElementById('steer')?.value || '';
   async function answer(optionId) {
     await fetch('/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ optionId, steer: steer() }) });
-    document.body.innerHTML = '<div class="done">Choice recorded. You can close this tab; the agent is resuming.</div>';
+    document.body.innerHTML = '<div class="done"><svg viewBox="0 0 32 32" width="40" height="40" aria-hidden="true"><path d="M7 1 L18 1 L8 31 L7 31 Q1 31 1 25 L1 7 Q1 1 7 1 Z" fill="oklch(84% 0.19 80.46)"/><path d="M22 1 L25 1 Q31 1 31 7 L31 25 Q31 31 25 31 L12 31 Z" fill="oklch(84% 0.19 80.46)"/></svg>Choice recorded. The agent is resuming; you can close this tab.</div>';
   }
   document.querySelectorAll('button.choose').forEach(b => b.addEventListener('click', () => answer(b.dataset.id)));
   document.getElementById('reroll')?.addEventListener('click', () => answer('reroll'));
