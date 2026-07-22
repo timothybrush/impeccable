@@ -90,6 +90,51 @@ describe('serve-question', () => {
     assert.match(collected.out, /"optionId":"assigned"/);
   });
 
+  it('headless detection spares the modes that never open a browser', async () => {
+    // Only the blocking serve path auto-opens a URL. --wait polls a daemon
+    // that is already running, --stop kills one, --schema just prints text,
+    // so a headless environment must not turn any of them into exit 2: the
+    // documented flow polls --wait while it exits 3, and new-work.md tells
+    // the agent to read --schema first.
+    const dir = mkdtempSync(path.join(tmpdir(), 'serve-question-'));
+    const payloadPath = path.join(dir, 'q.json');
+    writeFileSync(payloadPath, JSON.stringify(PAYLOAD));
+    const headlessEnv = { ...process.env, CI: '1' };
+    delete headlessEnv.IMPECCABLE_QUESTION_FORCE;
+    const run = (args) => new Promise((resolve) => {
+      const child = spawn(process.execPath, [SCRIPT, ...args], { cwd: dir, env: headlessEnv, stdio: ['ignore', 'pipe', 'ignore'] });
+      let out = '';
+      child.stdout.on('data', (chunk) => { out += chunk; });
+      child.on('exit', (code) => resolve({ code, out }));
+    });
+
+    const schema = await run(['--schema']);
+    assert.equal(schema.code, 0, `--schema under CI must print, got ${schema.code}: ${schema.out}`);
+
+    const started = await run(['--start', '--payload', payloadPath, '--no-open', '--key', 'hk']);
+    assert.equal(started.code, 0, started.out);
+    try {
+      const waiting = await run(['--wait', '--key', 'hk', '--poll', '1']);
+      assert.equal(waiting.code, 3, `--wait under CI must report WAITING, got ${waiting.code}: ${waiting.out}`);
+    } finally {
+      const stopped = await run(['--stop', '--key', 'hk']);
+      assert.equal(stopped.code, 0, `--stop under CI must kill the daemon, got ${stopped.code}: ${stopped.out}`);
+    }
+  });
+
+  it('headless detection still blocks the path that would open a browser', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'serve-question-'));
+    const payloadPath = path.join(dir, 'q.json');
+    writeFileSync(payloadPath, JSON.stringify(PAYLOAD));
+    const headlessEnv = { ...process.env, CI: '1' };
+    delete headlessEnv.IMPECCABLE_QUESTION_FORCE;
+    const code = await new Promise((resolve) => {
+      const child = spawn(process.execPath, [SCRIPT, '--payload', payloadPath], { cwd: dir, env: headlessEnv, stdio: 'ignore' });
+      child.on('exit', resolve);
+    });
+    assert.equal(code, 2);
+  });
+
   it('rejects an empty payload', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'serve-question-'));
     const payloadPath = path.join(dir, 'q.json');

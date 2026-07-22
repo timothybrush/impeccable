@@ -75,9 +75,14 @@ if (process.env.IMPECCABLE_QUESTION_DISABLED) {
   console.log('serve-question: disabled in this session (no browser); use the structured question tool instead.');
   process.exit(2);
 }
-// Headless self-detection: --no-open means the caller opens the URL itself,
-// so only environments that would need a browser opened for them are checked.
-if (!process.argv.includes('--no-open') && !process.env.IMPECCABLE_QUESTION_FORCE) {
+// Headless self-detection, applied only where a browser is actually wanted.
+// --no-open means the caller opens the URL itself, and --wait / --stop /
+// --schema never open anything: --wait polls a daemon whose browser question
+// was already settled at --start, --stop kills one, --schema prints text. A
+// spurious exit 2 from those breaks the documented loop, which polls --wait
+// while it exits 3 and reads --schema before building a payload.
+const wantsBrowser = !hasFlag('no-open') && !hasFlag('wait') && !hasFlag('stop') && !hasFlag('schema');
+if (wantsBrowser && !process.env.IMPECCABLE_QUESTION_FORCE) {
   const headless =
     process.env.CI ||
     (process.env.SSH_CONNECTION && !process.env.DISPLAY) ||
