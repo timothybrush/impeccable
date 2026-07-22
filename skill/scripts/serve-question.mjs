@@ -107,8 +107,14 @@ if (hasFlag('wait')) {
     await new Promise((r) => setTimeout(r, 1000));
   }
   if (!answered()) { console.log(`WAITING: no answer yet after ${pollSec}s; run --wait --key ${key} again`); process.exit(3); }
-  console.log(`ANSWER: ${fs.readFileSync(answerFile(key), 'utf8').trim()}`);
-  try { fs.rmSync(answerFile(key)); fs.rmSync(stateFile(key)); } catch { /* already cleaned */ }
+  const collected = fs.readFileSync(answerFile(key), 'utf8').trim();
+  console.log(`ANSWER: ${collected}`);
+  // A re-roll keeps the table open: the server stays alive awaiting --update,
+  // so only the answer file is consumed. Terminal choices clean up fully.
+  let isRerollAnswer = false;
+  try { isRerollAnswer = JSON.parse(collected).optionId === 'reroll'; } catch { /* treat as terminal */ }
+  try { fs.rmSync(answerFile(key)); } catch { /* already gone */ }
+  if (!isRerollAnswer) { try { fs.rmSync(stateFile(key)); } catch { /* already gone */ } }
   process.exit(0);
 }
 
