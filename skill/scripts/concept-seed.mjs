@@ -448,7 +448,10 @@ No challengers this run: the roll service was unreachable and no local
 catalog exists. Proceed with the grounded candidates alone; the assignment
 above still applies at full strength. Tell the user plainly that this roll
 ran degraded, with no challengers and no quality-bar boards; do not present
-the outcome as a full roll.
+the outcome as a full roll. A degraded roll changes the cards, not the
+channel: when a browser can open, present the direction on the decision page
+(serve-question.mjs, text-only card); the structured question tool remains
+the no-browser fallback.
 ${authorityInstruction}
 A user- or brief-pinned decision beats the roll, always.
 `;
