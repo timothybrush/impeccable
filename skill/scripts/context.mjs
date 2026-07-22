@@ -33,6 +33,12 @@ import { fileURLToPath } from 'node:url';
 import { parseTargetOptions } from './lib/target-args.mjs';
 import { IMPECCABLE_COMMAND, IMPECCABLE_PROVIDER_ID } from './lib/provider.mjs';
 import { resolveSurfaceBrief } from './lib/surface-briefs.mjs';
+import { collectBootFindings, designSidecarCandidatesFor } from './lib/staleness.mjs';
+import {
+  buildStalenessDirective,
+  filterFreshFindings,
+  stalenessCheckDisabled,
+} from './lib/staleness-notice.mjs';
 
 const PRODUCT_NAMES = ['PRODUCT.md', 'Product.md', 'product.md'];
 const DESIGN_NAMES = ['DESIGN.md', 'Design.md', 'design.md'];
@@ -1138,6 +1144,7 @@ async function cli() {
     if (shouldWarnMissingTarget(ctx, targetProvided, targetExists)) {
       parts.push(buildMissingTargetDirective());
     }
+    appendStalenessDirective(parts, ctx, cliOptions);
     if (updateDirective) parts.push(updateDirective);
     process.stdout.write(parts.join('\n\n---\n\n') + '\n');
     process.exit(0);
@@ -1169,6 +1176,7 @@ async function cli() {
       `# NATIVE PLATFORM REFERENCE: ${reference.name.toUpperCase()} (reference/${reference.name}.md)\n\n${reference.content.trim()}`,
     );
   }
+  appendStalenessDirective(parts, ctx, cliOptions);
   if (!ctx.platform) {
     // A `## Platform` section that names something we don't recognize (a
     // toolchain like `flutter`, a typo) would otherwise silently fall back to
@@ -1280,6 +1288,49 @@ function appendDetectorFallback(parts, ctx) {
     `Once the changed web UI is finished, run the mechanical detector over it: \`node ${scriptsPath}/detect.mjs --json <changed targets>\`.`,
     'Run it once, and not earlier during concept selection.',
   ].join(' '));
+}
+
+// Tier 1 staleness: schema drift in Impeccable's own project files, measured
+// with what the boot already spends. Everything here is either a parse of
+// markdown already in memory, a bounded set of stats, or one of the small JSON
+// files the boot reads regardless. The deep pass (git drift, token divergence,
+// cross-workspace sweep) belongs to the doctor command, not to every session.
+function appendStalenessDirective(parts, ctx, options) {
+  const projectRoot = ctx.projectRoot || process.cwd();
+  if (stalenessCheckDisabled([projectRoot, ctx.repoRoot])) return;
+  const absCwd = path.resolve(process.cwd());
+
+  let findings;
+  try {
+    findings = collectBootFindings(ctx, {
+      absProductPath: ctx.productPath ? path.resolve(absCwd, ctx.productPath) : null,
+      absDesignPath: ctx.designPath ? path.resolve(absCwd, ctx.designPath) : null,
+      sidecarCandidates: designSidecarCandidatesFor(projectRoot, ctx.contextDir),
+      ...projectRootsDiagnostic(ctx, options),
+    });
+  } catch {
+    // A staleness check must never be the reason a boot fails to print context.
+    return;
+  }
+
+  const fresh = filterFreshFindings(findings, { projectRoot });
+  const directive = buildStalenessDirective(fresh);
+  if (directive) parts.push(directive);
+}
+
+// `projectRoots` globs that match nothing leave the repo root standing in as
+// the active project with no other signal. Only computed in the one situation
+// where that happens and cli() has not already exited on a target selection:
+// a monorepo, at its root, with no --target. In that case discovery has just
+// returned an empty candidate list, so the walk repeated here is the cheap
+// path (a pattern that matches nothing exits before reading any directory).
+function projectRootsDiagnostic(ctx, options) {
+  if (hasTargetOption(options)) return {};
+  if (!ctx.isMonorepo || !ctx.repoRoot) return {};
+  if (path.resolve(ctx.projectRoot || '') !== path.resolve(ctx.repoRoot)) return {};
+  const patterns = readImpeccableProjectRoots(ctx.repoRoot);
+  if (!patterns.length) return {};
+  return { projectRootPatterns: patterns, targetCandidates: discoverTargetCandidates(ctx.repoRoot) };
 }
 
 function buildResolvedContextDirective(ctx, options, { targetExists = null } = {}) {

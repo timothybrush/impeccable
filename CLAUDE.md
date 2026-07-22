@@ -5,42 +5,70 @@
 There is **one** user-invocable skill, `impeccable`, with **23 commands** underneath it. Users type `/impeccable polish`, `/impeccable audit`, etc. The skill is defined in `skill/`:
 
 - `SKILL.src.md` — frontmatter (with the auto-trigger-optimized description and the `allowed-tools` list), shared design laws, and the **Commands** router table. Provider `SKILL.md` files are generated from this source.
-- `reference/` — one `<command>.md` per command (`audit.md`, `polish.md`, `critique.md`, etc.) plus the domain reference files (`typography.md`, `color-and-contrast.md`, etc.). When a sub-command is matched, the router loads its reference file.
-- `reference/brand.md` and `reference/product.md` — the two register references. SKILL.md's Setup section selects one based on the task cue, the surface in focus, or the `register` field in PRODUCT.md (first match wins).
+- `reference/` — one `<command>.md` per command (`audit.md`, `polish.md`, `critique.md`, etc.), the shared playbooks the router loads outside the command table (`new-work.md`, `craft-floor.md`, `operate.md`, `routing.md`), and the native platform references (`ios.md`, `android.md`). When a sub-command is matched, the router loads its reference file.
 - `scripts/command-metadata.json` — single source of truth for each command's description, argument hint, and (eventually) category. Both the build and `pin.mjs` read from this.
 - `scripts/pin.mjs` — creates/removes lightweight redirect shims so users can have `/audit` as a standalone shortcut that delegates to `/impeccable audit`.
 
 **Do not add standalone skills** unless there's a strong reason. The consolidation was deliberate: the `/` menu pollution problem is real and gets worse as users install more plugins.
 
-### Register (brand vs product)
+**Do not reintroduce per-domain reference files.** v4 removed `typography.md`, `color-and-contrast.md`, `spatial-design.md`, `motion-design.md`, `interaction-design.md`, `responsive-design.md`, `ux-writing.md`, `cognitive-load.md`, `personas.md`, `heuristics-scoring.md`, `build-floor.md`, and `live-generation.md`. Their content lives in the command references and `craft-floor.md`, where it is loaded only when it applies.
 
-Every design task belongs to one of two registers:
+### Modes (Persuade / Operate / Read / Experience)
 
-- **Brand** — design IS the product: marketing, landing pages, brand sites, campaign surfaces, portfolios, long-form content. Distinctiveness is the bar. Spans every visual lane (tech-minimal, luxury, editorial-magazine, consumer-warm, brutalist, etc.) — do not default to only one.
-- **Product** — design SERVES the product: app UI, admin, dashboards, tools. Earned familiarity is the bar — fluent users of Linear / Figma / Notion / Raycast / Stripe should trust it.
+v4 replaced the old brand/product **register** axis with four modes, named in SKILL.src.md's `## Modes` section. A mode names what the visitor's success looks like on the surface in hand:
 
-PRODUCT.md at the project root carries a `## Register` section with a bare value (`brand` or `product`). `/impeccable init` asks about register first because it shapes every downstream answer.
+- **Persuade** — the visitor decides and acts; design is the product. Landing pages, marketing, campaigns, pricing.
+- **Operate** — the visitor completes a task. App UI, dashboards, editors, admin, settings, tools.
+- **Read** — the visitor understands something. Docs, articles, guides, help, changelogs.
+- **Experience** — the visitor is inside the work itself. Portfolios, galleries, showcases.
 
-Sub-command reference files add a short `## Register` section near the top *only where the answer diverges between the two*. Don't restate the register files' content in sub-commands — link instead. Sub-commands where register meaningfully diverges today: `typeset`, `animate`, `bolder`, `delight`, `colorize`, `layout`, `quieter`.
+Three differences from register that matter when editing skill text:
 
-**a11y lives in `audit.md`**, not in SKILL.md, `brand.md`, or `product.md`. Models over-cautious themselves into safe, underdesigned output when reminded about accessibility at design time. The audit command is the dedicated place for that check.
+1. **Mode is per surface, not per project.** A tool's landing page is Persuade even though the product is Operate; a fashion house's documentation is Read. Choose from the requested surface.
+2. **Mode is not stored in PRODUCT.md.** It persists only in that surface's brief under `.impeccable/surfaces/`. There is no `## Register` field and no `extractRegister()`; PRODUCT.md's only bare-value field is `## Platform`. A `## Register` section left over from v3 is reported at boot as deprecated (see `lib/staleness.mjs`) and read by nothing.
+3. **There are no register reference files.** `reference/brand.md` and `reference/product.md` are gone. `reference/operate.md` carries the deeper Operate and Read guidance; `reference/new-work.md` owns new surfaces.
+
+**a11y lives in `audit.md`**, not in SKILL.md or the mode guidance. Models over-cautious themselves into safe, underdesigned output when reminded about accessibility at design time. The audit command is the dedicated place for that check.
 
 ### Platform (web / ios / android / adaptive)
 
-A second axis, **orthogonal to register**. Register answers "does design IS or SERVES the product"; platform answers "what's the delivery target and which native conventions apply":
+A second axis, **orthogonal to mode**. Mode answers "what does the visitor come here to do"; platform answers "what's the delivery target and which native conventions apply":
 
-- **web** — a website or web app (including responsive mobile web). The default. No extra rulebook and no reference file: the General rules in SKILL.md and the register reference cover it.
-- **ios** — a native iOS / iPadOS app. Loads `reference/ios.md` (Apple HIG distilled) on top of the register reference.
-- **android** — a native Android app. Loads `reference/android.md` (Material Design 3 distilled) on top of the register reference.
+- **web** — a website or web app (including responsive mobile web). The default. No extra rulebook and no reference file: the General rules in SKILL.md cover it.
+- **ios** — a native iOS / iPadOS app. Loads `reference/ios.md` (Apple HIG distilled).
+- **android** — a native Android app. Loads `reference/android.md` (Material Design 3 distilled).
 - **adaptive** — a cross-platform app shipping both iOS and Android from one codebase (Flutter, React Native, KMP) that adapts per OS. Loads **both** `reference/ios.md` and `reference/android.md`. A Flutter/RN app that uses one look on both platforms (Material-everywhere is the Flutter default) is not adaptive; it takes that single platform's value.
 
-PRODUCT.md carries a `## Platform` section with a bare value (`web` / `ios` / `android` / `adaptive`). It's parsed by `extractPlatform()` in `skill/scripts/context.mjs` (mirroring `extractRegister()`); a **missing field defaults to `web`** so legacy projects are unaffected. A line that names both native targets (e.g. `ios, android`) is also read as `adaptive`; any other unrecognized value falls back to web **and** the `context.mjs` CLI prints a WARNING directive naming the bad value, so a toolchain name or typo never silently gets web guidance. `context.mjs` appends a NEXT STEP directive to read the native reference(s) when the value is `ios`, `android`, or `adaptive` (both). `init` (Step 3) asks platform right after register.
+PRODUCT.md carries a `## Platform` section with a bare value (`web` / `ios` / `android` / `adaptive`). It's parsed by `extractPlatform()` in `skill/scripts/context.mjs`, built on the generic `extractSectionValue()` helper; a **missing field defaults to `web`** so legacy projects are unaffected. A line that names both native targets (e.g. `ios, android`) is also read as `adaptive`; any other unrecognized value falls back to web **and** the `context.mjs` CLI prints a WARNING directive naming the bad value, so a toolchain name or typo never silently gets web guidance. `context.mjs` inlines the native reference(s) directly into its output when the value is `ios`, `android`, or `adaptive` (both), so native conventions land in context without a second model-directed read. `init` (Step 3) confirms an ambiguous platform as part of the product-truth interview, and Step 4 records it as the bare value.
 
 `ios.md` and `android.md` are distilled from the MIT-licensed [ehmo/platform-design-skills](https://github.com/ehmo/platform-design-skills); attribution is in `NOTICE.md`.
 
 Where a command's native guidance diverges too much to share a file, it gets a **native variant**: `reference/<command>.native.md`, listed in SKILL.md's Commands table and routed **instead of** the web file when `setup.platform` is native (Setup step 2). One variant covers ios, android, and adaptive; per-OS specifics stay in the platform refs, which Setup loads regardless. Variants today: `audit.native.md`, `adapt.native.md` (their web files carry a one-line web-only guard that redirects stray native readers). `audit.native.md` mirrors `audit.md`'s report skeleton; change the skeleton in both together. Commands whose divergence the platform refs already cover (`animate`, `layout`) carry nothing extra; don't add in-file translation notes, they make native runs pay for web content.
 
 **Live mode, the `detect` CLI, and the design hook are web-only.** They operate on a browser / HTML rules, so SKILL.md's routing skips live and `detect.mjs` for any native (`ios` / `android` / `adaptive`) project, and the hook (`hook-lib.mjs` `resolveProjectPlatform` / `isNativePlatform`, also used by `hook-before-edit.mjs`) skips its scan when PRODUCT.md declares a native platform — a React Native project is made of exactly the `.tsx` / `.ts` / `.js` files the hook watches.
+
+### Artifact staleness and the doctor pass
+
+Impeccable writes files into user projects, so a released version has to cope with artifacts an older one wrote. Three kinds of drift travel under "out of date" and they are handled separately:
+
+1. **Tool version drift** (installed skill older than published). `computeUpdateDirective()` in `context.mjs`, emitted as `UPDATE_AVAILABLE`. Predates this system, unchanged.
+2. **Schema drift** (an artifact carries fields nothing reads, is missing fields now expected, or sits in a retired location). Deterministic. `skill/scripts/lib/staleness.mjs`.
+3. **Truth drift** (the code moved on and the document no longer describes it). Not mechanical. `document` and `init` own the rewrite; the deep pass measures a proxy and is required to say it is a proxy.
+
+**Two tiers, and the split is a performance contract, not a preference.**
+
+- **Tier 1** is `collectBootFindings()` in `lib/staleness.mjs`, called from `appendStalenessDirective()` in `context.mjs`. It may only spend what a boot already spends: markdown already in memory, a bounded set of stats, and the small JSON files the boot reads regardless. **No directory walks, no git, no cross-workspace sweep.** The one walk it uses (`discoverTargetCandidates`) is one `resolveTargetSelection` has already paid for. Adding an expensive check here taxes every session in every project.
+- **Tier 2** is `lib/staleness-deep.mjs`, run on demand by `skill/scripts/doctor.mjs`. Git log, per-workspace sweep, ignore-list validation against the live `ANTIPATTERNS` registry, hook script resolution.
+
+**Findings are data.** `{ id, artifact, path, severity, summary, fix }`, so the boot directive, the text report, and `--json` all render one set. Severity says what should happen, not how bad it is: `auto` (fix silently on the next write to that file), `mention` (state once, carry on), `route` (name the command that owns the repair). `doctor --fix` applies only `auto`, and only where no judgment is involved.
+
+**Emission discipline.** Boot output is already heavy, so Tier 1 emits **one** `CONTEXT_STALE` directive for the whole set, and `lib/staleness-notice.mjs` throttles `mention` and `route` findings to once a week per project (cached in `~/.impeccable/staleness-check.json`, alongside the update cache, so no gitignore entry is owed). `auto` findings are never throttled and never shown to the user. Opt out with `"stalenessCheck": false` or `IMPECCABLE_NO_STALENESS_CHECK=1`. **A test that asserts on other boot directives should set that env var**, which is why the update-check suite in `tests/context.test.mjs` does.
+
+**Provenance stamps.** PRODUCT.md carries `<!-- impeccable:product-schema N -->` (constants in `lib/artifact-schema.mjs`, template in `init.md`). Without it, every check is a heuristic reconstruction of what era a file came from. **Stamps are schema versions, not release versions**: a PRODUCT.md written by v4.0.0 is not stale under v4.0.1, and a schema version changes only when the shape does. **DESIGN.md deliberately carries no stamp** because it follows the external design.md spec that Stitch's linter validates, and every DESIGN.md signal (sidecar `schemaVersion`, sidecar mtime, section coverage, git drift) is measurable without one.
+
+**When you retire a PRODUCT.md field, add it to `PRODUCT_DEPRECATED_SECTIONS`** in `lib/artifact-schema.mjs` with the reason. The reason is not decoration: told only that a field is deprecated, models preserve it "just in case", which is how a retired axis keeps steering current output.
+
+**`doctor` is a utility command, not a design command.** It follows the `hooks` and `pin` pattern (a line in SKILL.src.md plus `reference/doctor.md`), not the Commands-table pattern. It is deliberately **not** in `IMPECCABLE_SUB_COMMANDS`, `command-metadata.json`, `SKILL_CATEGORIES`, or `pin.mjs`'s `VALID_COMMANDS`, and it does not count toward the 23. Keep maintenance tooling out of the design menu.
 
 ## Repo split: public product vs private service (impeccable-site)
 
@@ -139,36 +167,19 @@ Adding a new fixture is a matter of cloning a directory under `tests/framework-f
 
 ### Skill-behavior tests
 
-`tests/skill-behavior/scenarios.test.mjs` is the LLM-backed safety net for edits to `skill/SKILL.src.md` and the Setup-adjacent reference files (`init.md`, `document.md`, `brand.md`, `product.md`, sub-command refs). It inlines the source `skill/SKILL.src.md` into the system prompt of a real LLM, gives the agent `bash` / `read` / `write` / `list` tools scoped to a temp workspace, and asserts on the tool-call trace — not on the model's free-form output. The trace is the source of truth.
+`tests/skill-behavior/scenarios.test.mjs` is the LLM-backed safety net for edits to `skill/SKILL.src.md` and the Setup-adjacent reference files (`init.md`, `document.md`, `new-work.md`, sub-command refs). It inlines the source `skill/SKILL.src.md` into the system prompt of a real LLM, gives the agent `bash` / `read` / `write` / `list` tools scoped to a temp workspace, and asserts on the tool-call trace — not on the model's free-form output. The trace is the source of truth. `tests/skill-behavior/workflow-contract.test.mjs` adds the end-to-end flows (attended fresh init, initialized natural build request, replacement-world redesign, scope-preserving refinement), asserting on question order and artifact writes.
 
 ```bash
-bun run test:skill-behavior                                              # full suite (27 tests, ~5 min, ~$0.50-1.50 across providers)
-IMPECCABLE_SKILL_BEHAVIOR_MODELS=gemini-3.1-flash-lite bun run test:skill-behavior   # scope to one provider
-IMPECCABLE_SKILL_BEHAVIOR_VERBOSE=1 bun run test:skill-behavior          # dump per-scenario trace JSON to stderr (use when iterating)
+bun run test:skill-behavior                                        # full suite, ~5 min, ~$0.50-1.50 across providers
+IMPECCABLE_SKILL_BEHAVIOR_MODELS=gemini-3.5-flash bun run test:skill-behavior   # scope to one provider
+IMPECCABLE_SKILL_BEHAVIOR_VERBOSE=1 bun run test:skill-behavior    # dump per-scenario trace JSON to stderr (use when iterating)
 ```
 
-**Three providers per run, every run.** The suite always exercises `claude-sonnet-4-6`, `gpt-5.5`, and `gemini-3.1-flash-lite`. Sonnet and GPT-5.5 are production-tier, matching what users actually run, so the pass/fail signal reflects real agent behavior rather than a cheap proxy; gemini stays on the flash-lite tier. **Don't substitute Claude alone**: many of the most useful findings come from divergence between providers.
+**Every provider, every run.** The lineup is `DEFAULT_MODELS` in `tests/skill-behavior/providers.mjs`, currently `claude-sonnet-5`, `gpt-5.6-luna`, `gemini-3.5-flash`, and `deepseek-v4-flash`. **Don't substitute Claude alone**: many of the most useful findings come from divergence between providers.
 
 **Auth** lives in repo-root `.env` (copied from `~/code/impeccable-evals/.env`, gitignored). Providers skip cleanly when their key is unset; they don't fail.
 
-**Fifteen scenarios:**
-1. empty workspace → agent loads `reference/init.md`
-2. PRODUCT.md only → loads `brand.md`
-3. PRODUCT.md + DESIGN.md → loads `brand.md` + consults the design system
-4. context already loaded in turn 1 → turn 2 does **not** re-run `context.mjs`
-5. PRODUCT.md without `## Register` field → agent infers `brand` from task cue
-6. `/impeccable polish` → loads `reference/polish.md`
-7. `/impeccable audit` → loads `reference/audit.md`
-8. existing SvelteKit project → agent reads at least one project code file
-9. `context.mjs` emits `UPDATE_AVAILABLE` (seeded newer version) → agent surfaces it but does **not** auto-run `npx impeccable skills update`
-10. scoped command with no PRODUCT.md → proceeds without forcing init
-11. `/impeccable shape` with no PRODUCT.md → diverts into `reference/init.md`
-12. natural-language build intent with no PRODUCT.md → diverts into `reference/init.md`
-13. `/impeccable teach` → diverts into `reference/init.md` (alias)
-14. PRODUCT.md with `## Platform: ios` → `context.mjs` emits the native NEXT STEP and the agent loads `reference/ios.md`
-15. same iOS fixture, `/impeccable audit` → agent loads `reference/audit.native.md` (route-instead variant)
-
-**Baseline.** The 21-22 / 24 baseline (with stable gpt scenario 6/7 failures) was measured on the old cheap tier (`claude-haiku-4-5` / `gpt-5.4-mini`). It needs re-measuring on the current `claude-sonnet-4-6` / `gpt-5.5` lineup; the production-tier models are expected to do better on the sub-command routing scenarios the old gpt tier failed. See `tests/skill-behavior/README.md`.
+**The scenario list and the baseline live in `tests/skill-behavior/README.md`**, not here. Read that table before changing Setup or routing text, and update it in the same change. Duplicating it in this file is how it went stale before.
 
 **Cost.** Each run is real LLM calls, billed to the keys in `.env`. Production-tier models put a full sweep around $0.50-1.50. Keep it out of CI unless you really want it there.
 

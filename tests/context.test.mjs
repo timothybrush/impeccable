@@ -48,6 +48,27 @@ function write(rel, body = '# placeholder\n') {
   return abs;
 }
 
+// Stage a runnable copy of context.mjs plus its whole lib/ directory.
+// The bundle tests used to enumerate the helpers they needed, which turned
+// every new import in context.mjs into a mysterious non-zero exit here.
+// Copying the directory keeps them honest about what the real script loads.
+function stageContextBundle(scriptsDir, { providerId } = {}) {
+  const libSrc = path.join(path.dirname(SCRIPT_PATH), 'lib');
+  const libDest = path.join(scriptsDir, 'lib');
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.copyFileSync(SCRIPT_PATH, path.join(scriptsDir, 'context.mjs'));
+  fs.cpSync(libSrc, libDest, { recursive: true });
+  if (providerId) {
+    const providerPath = path.join(libDest, 'provider.mjs');
+    fs.writeFileSync(
+      providerPath,
+      fs.readFileSync(providerPath, 'utf8')
+        .replace("IMPECCABLE_PROVIDER_ID = 'source'", `IMPECCABLE_PROVIDER_ID = '${providerId}'`),
+    );
+  }
+  return path.join(scriptsDir, 'context.mjs');
+}
+
 function parseTargetSelection(stdout) {
   const tail = stdout.split('TARGET_SELECTION_REQUIRED:\n')[1];
   assert.ok(tail, `missing TARGET_SELECTION_REQUIRED block in:\n${stdout}`);
@@ -479,7 +500,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     const selection = parseTargetSelection(res.stdout);
@@ -510,7 +531,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.doesNotMatch(res.stdout, /MONOREPO_TARGET_REQUIRED/);
@@ -523,7 +544,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH, '--target', 'apps/dashboard/src/App.jsx'], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /# Dashboard product/);
@@ -540,7 +561,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /TARGET_SELECTION_REQUIRED:/);
@@ -565,7 +586,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     const selection = parseTargetSelection(res.stdout);
@@ -626,7 +647,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     const selection = parseTargetSelection(res.stdout);
@@ -648,7 +669,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /TARGET_SELECTION_REQUIRED:/);
@@ -665,7 +686,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     const selection = parseTargetSelection(res.stdout);
@@ -682,7 +703,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.doesNotMatch(res.stdout, /TARGET_SELECTION_REQUIRED/);
@@ -694,7 +715,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH, '--target', '.'], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /# PRODUCT\.md\n\n# Root product/);
@@ -708,7 +729,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH, '--target', '--help'], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /--target requires a path value/);
@@ -727,7 +748,7 @@ describe('loadContext (monorepo project context)', () => {
     ], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0, res.stderr);
     assert.match(res.stdout, /# Dashboard product/);
@@ -740,7 +761,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH, '--target', 'apps/dashboard/routes/pricing'], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
 
     assert.equal(res.status, 0, res.stderr);
@@ -760,7 +781,7 @@ describe('loadContext (monorepo project context)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /TARGET_SELECTION_REQUIRED:/);
@@ -835,7 +856,7 @@ describe('loadContext (impeccable projectRoots config)', () => {
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     const selection = parseTargetSelection(res.stdout);
@@ -851,7 +872,7 @@ describe('loadContext (impeccable projectRoots config)', () => {
       const res = spawnSync(process.execPath, [SCRIPT_PATH], {
         cwd: scratch,
         encoding: 'utf8',
-        env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+        env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
       });
       assert.equal(res.status, 0, res.stderr);
       const selection = parseTargetSelection(res.stdout);
@@ -1041,15 +1062,7 @@ describe('context.mjs CLI', () => {
 
   it('keeps the manual-detector directive out of early context when the current provider hook is active', () => {
     const scripts = path.join(scratch, 'bundle', 'skills', 'impeccable', 'scripts');
-    const lib = path.join(scripts, 'lib');
-    fs.mkdirSync(lib, { recursive: true });
-    fs.copyFileSync(SCRIPT_PATH, path.join(scripts, 'context.mjs'));
-    for (const helper of ['target-args.mjs', 'surface-briefs.mjs', 'target-slug.mjs']) {
-      fs.copyFileSync(path.join(path.dirname(SCRIPT_PATH), 'lib', helper), path.join(lib, helper));
-    }
-    const provider = fs.readFileSync(path.join(path.dirname(SCRIPT_PATH), 'lib', 'provider.mjs'), 'utf8')
-      .replace("IMPECCABLE_PROVIDER_ID = 'source'", "IMPECCABLE_PROVIDER_ID = 'codex'");
-    fs.writeFileSync(path.join(lib, 'provider.mjs'), provider);
+    stageContextBundle(scripts, { providerId: 'codex' });
 
     const project = path.join(scratch, 'project');
     fs.mkdirSync(path.join(project, '.codex'), { recursive: true });
@@ -1061,7 +1074,7 @@ describe('context.mjs CLI', () => {
     const res = spawnSync(process.execPath, [path.join(scripts, 'context.mjs')], {
       cwd: project,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0, res.stderr);
     assert.doesNotMatch(res.stdout, /MANUAL_DETECTOR_REQUIRED:/);
@@ -1071,7 +1084,7 @@ describe('context.mjs CLI', () => {
     const disabled = spawnSync(process.execPath, [path.join(scripts, 'context.mjs')], {
       cwd: project,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(disabled.status, 0, disabled.stderr);
     assert.match(disabled.stdout, /MANUAL_DETECTOR_REQUIRED:/);
@@ -1080,15 +1093,7 @@ describe('context.mjs CLI', () => {
 
   it('adds no detector directive when a per-edit-only hook is active', () => {
     const scripts = path.join(scratch, 'bundle', 'skills', 'impeccable', 'scripts');
-    const lib = path.join(scripts, 'lib');
-    fs.mkdirSync(lib, { recursive: true });
-    fs.copyFileSync(SCRIPT_PATH, path.join(scripts, 'context.mjs'));
-    for (const helper of ['target-args.mjs', 'surface-briefs.mjs', 'target-slug.mjs']) {
-      fs.copyFileSync(path.join(path.dirname(SCRIPT_PATH), 'lib', helper), path.join(lib, helper));
-    }
-    const provider = fs.readFileSync(path.join(path.dirname(SCRIPT_PATH), 'lib', 'provider.mjs'), 'utf8')
-      .replace("IMPECCABLE_PROVIDER_ID = 'source'", "IMPECCABLE_PROVIDER_ID = 'cursor'");
-    fs.writeFileSync(path.join(lib, 'provider.mjs'), provider);
+    stageContextBundle(scripts, { providerId: 'cursor' });
 
     const project = path.join(scratch, 'project');
     fs.mkdirSync(path.join(project, '.cursor'), { recursive: true });
@@ -1100,7 +1105,7 @@ describe('context.mjs CLI', () => {
     const res = spawnSync(process.execPath, [path.join(scripts, 'context.mjs')], {
       cwd: project,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0, res.stderr);
     assert.doesNotMatch(res.stdout, /MANUAL_DETECTOR_REQUIRED:/);
@@ -1193,7 +1198,7 @@ Make plan tradeoffs legible before asking for a trial.
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /# SURFACE BRIEF \(\.impeccable\/surfaces\/src-pages-pricing-astro\.md\)/);
@@ -1230,7 +1235,7 @@ HOME_STRATEGY_SENTINEL
     const res = spawnSync(process.execPath, [SCRIPT_PATH, '--target', 'src/pages/pricing.astro'], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /PRICING_STRATEGY_SENTINEL/);
@@ -1257,7 +1262,7 @@ related_targets: []
     const res = spawnSync(process.execPath, [SCRIPT_PATH], {
       cwd: scratch,
       encoding: 'utf8',
-      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1' },
+      env: { ...process.env, IMPECCABLE_NO_UPDATE_CHECK: '1', IMPECCABLE_NO_STALENESS_CHECK: '1' },
     });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /SURFACE_CONTEXT_AVAILABLE:/);
@@ -1354,22 +1359,7 @@ describe('context.mjs update check', () => {
   const cachePath = () => path.join(scratch, 'update-check.json');
 
   function setup(cacheObj, { disable = false, host } = {}) {
-    const skillScript = path.join(scratch, 'skill', 'scripts', 'context.mjs');
-    fs.mkdirSync(path.dirname(skillScript), { recursive: true });
-    fs.copyFileSync(SCRIPT_PATH, skillScript);
-    const targetArgsSrc = path.join(path.dirname(SCRIPT_PATH), 'lib', 'target-args.mjs');
-    const targetArgsDest = path.join(path.dirname(skillScript), 'lib', 'target-args.mjs');
-    fs.mkdirSync(path.dirname(targetArgsDest), { recursive: true });
-    fs.copyFileSync(targetArgsSrc, targetArgsDest);
-    const providerSrc = path.join(path.dirname(SCRIPT_PATH), 'lib', 'provider.mjs');
-    const providerDest = path.join(path.dirname(skillScript), 'lib', 'provider.mjs');
-    fs.copyFileSync(providerSrc, providerDest);
-    for (const helper of ['surface-briefs.mjs', 'target-slug.mjs']) {
-      fs.copyFileSync(
-        path.join(path.dirname(SCRIPT_PATH), 'lib', helper),
-        path.join(path.dirname(skillScript), 'lib', helper),
-      );
-    }
+    const skillScript = stageContextBundle(path.join(scratch, 'skill', 'scripts'));
     fs.writeFileSync(
       path.join(scratch, 'skill', 'SKILL.md'),
       `---\nname: impeccable\nversion: ${LOCAL_VERSION}\n---\n\nbody\n`,
@@ -1382,6 +1372,10 @@ describe('context.mjs update check', () => {
       ...process.env,
       IMPECCABLE_UPDATE_CACHE: cachePath(),
       IMPECCABLE_NO_UPDATE_CHECK: disable ? '1' : '',
+      // This suite asserts on the update directive alone. Staleness findings
+      // are a separate directive with their own tests, and leaving the check on
+      // would also write notice state into the developer's home dir.
+      IMPECCABLE_NO_STALENESS_CHECK: '1',
       ...(host ? { IMPECCABLE_UPDATE_HOST: host } : {}),
     };
     return { skillScript, project, env };

@@ -58,6 +58,8 @@ Write only confirmed facts and explicitly marked open decisions. Omit irrelevant
 ```markdown
 # Product
 
+<!-- impeccable:product-schema 1 -->
+
 ## Platform
 
 web
@@ -91,6 +93,8 @@ web
 ```
 
 Platform is the bare value `web`, `ios`, `android`, or `adaptive`. Preserve useful legacy headings. New files go at `PROJECT_ROOT/PRODUCT.md`; otherwise update the resolved file. Write it before any visual-world or surface-concept work.
+
+Copy the `impeccable:product-schema` comment verbatim, including when you update an older file. It records which version of the product record this file follows, so later versions can tell a deliberately short record from one written before a section existed, and never propose an interview the user has already sat through. Update the number only when this reference's template changes it. Sections a later version retires are reported to you at boot as deprecated; delete them when the user agrees rather than carrying them forward.
 
 When the platform you just recorded is `ios`, `android`, or `adaptive`, load [ios.md](ios.md), [android.md](android.md), or both before any design work. On a project that had no PRODUCT.md, context.mjs could not know the platform and so never loaded them; init is the only place that learns the answer.
 
