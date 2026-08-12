@@ -42,14 +42,14 @@
  *                                // raise lines under the identity row
  *       "risk": "one line: the honest risk",                      // optional
  *       "body": "fallback prose when the structured fields are absent",
- *       "sketch": ".impeccable/mocks/decision/assigned.webp",  // optional; the card's
- *                                // full-fidelity direction comp (the field
- *                                // keeps the sketch era's wire name). May not
- *                                // exist yet: the page shimmer-waits and
+ *       "comp": ".impeccable/mocks/decision/assigned.webp",  // optional; the card's
+ *                                // full-fidelity direction comp (the legacy
+ *                                // key "sketch" is accepted as an alias). May
+ *                                // not exist yet: the page shimmer-waits and
  *                                // polls the slot until the file lands, so
  *                                // serve first and generate after
  *       "hero": "https://... or /abs/path.webp",   // optional inspiration image;
- *                                // rides picture-in-picture when a sketch exists
+ *                                // rides picture-in-picture when a comp exists
  *       "board": "https://... or /abs/path.webp"   // optional secondary image
  *     }, ...
  *   ],
@@ -61,7 +61,7 @@
  *   "canon": true,           // adds the "Play it straight" standing exit;
  *                            // direction rounds only (returns {"optionId":"canon"})
  *   "canonCard": { ... },    // optional: the standing exit as a full card with the
- *                            // same anatomy (label, thesis, palette, sketch, ...);
+ *                            // same anatomy (label, thesis, palette, comp, ...);
  *                            // rendered last and visually subordinate. Without it,
  *                            // canon stays a quiet footer action.
  *   "steer": true,           // adds a free-text steer field returned with any answer
@@ -75,7 +75,7 @@
  *                            // then the execution contract.
  * }
  *
- * Options render as large cards: the sketch leads when present, with the
+ * Options render as large cards: the comp leads when present, with the
  * inspiration image picture-in-picture; a hero alone renders full-bleed; a
  * text-only direction gets its identity from the palette chips and tags.
  * Local image paths are served by this server; nothing is uploaded anywhere.
@@ -148,7 +148,7 @@ function printAnswer(raw) {
     if (a.hero || a.board) {
       console.log("CHOSEN CARD: open the chosen world's board and hero images now, before any code. When your harness only reads files, or runs sandboxed, download them INTO the workspace and open the relative path; a sandboxed viewer rejects absolute paths outside it. They set the craft bar the build must reach.");
     }
-    if (a.sketch) {
+    if (a.comp) {
       console.log('CHOSEN COMP: the decision comp at that path is compositional option one. On a comp-led build the comp round adds two variations beside it; on a code-led build it returns at the finish review as the critique reference. Never regenerate it from scratch.');
     }
     if (a.optionId === 'canon') {
@@ -175,17 +175,17 @@ if (hasFlag('schema')) {
     title: 'Choose the visual world',
     question: 'The roll assigned Fillmore Handbill. Keep it, take an alternate, or re-roll.',
     options: [
-      { id: 'assigned', label: 'Fillmore Handbill', kicker: 'THE ROLL', lineage: '1966-71 Fillmore psychedelic handbills', thesis: 'The gig poster that treats every release like a one-night stand.', palette: ['#e8452c', '#f5d64c', '#1b2a52', '#f3ead8'], materials: ['letterpress', 'split-fountain ink'], viewport: 'A full-bleed dated bill with the product name in warped display type.', risk: 'Reads nostalgic when the type is set timidly.', raised: [{ from: 'challenger-microfiche', raise: 'The bill now owns its whole viewport as one continuous printed sheet.' }], sketch: '.impeccable/mocks/decision/assigned.webp', hero: 'https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill-hero.webp', board: 'https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill.webp' },
-      { id: 'model-pick', label: 'The Broadside Ballad', kicker: 'MY PICK', lineage: 'street-sold ballad sheets', thesis: 'Every release printed as the day’s ballad sheet.', palette: ['#1f1c18', '#efe5d0', '#a33327'], materials: ['woodcut', 'rag paper'], viewport: 'One tall sheet, the newest release as today’s ballad.', risk: 'Also the direction most runs in this category land on.', sketch: '.impeccable/mocks/decision/model-pick.webp' },
-      { id: 'challenger-teletext', label: 'Teletext Service', verdict: 'competitive', lineage: 'broadcast teletext magazines', thesis: 'The catalog as a broadcast index: pages, not sections.', palette: ['#0000c0', '#ffff00', '#00c000', '#ffffff'], materials: ['block mosaic', 'phosphor glow'], viewport: 'P100 index page, releases as numbered rows.', case: 'Fuses cleanly: releases map to numbered pages; loses narrowly on clarity.', risk: 'Reads retro-novelty when the grid is not strict.', sketch: '.impeccable/mocks/decision/challenger-teletext.webp', hero: 'https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp' },
+      { id: 'assigned', label: 'Fillmore Handbill', kicker: 'THE ROLL', lineage: '1966-71 Fillmore psychedelic handbills', thesis: 'The gig poster that treats every release like a one-night stand.', palette: ['#e8452c', '#f5d64c', '#1b2a52', '#f3ead8'], materials: ['letterpress', 'split-fountain ink'], viewport: 'A full-bleed dated bill with the product name in warped display type.', risk: 'Reads nostalgic when the type is set timidly.', raised: [{ from: 'challenger-microfiche', raise: 'The bill now owns its whole viewport as one continuous printed sheet.' }], comp: '.impeccable/mocks/decision/assigned.webp', hero: 'https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill-hero.webp', board: 'https://impeccable.style/worlds/cards/posters-covers-sleeves-fillmore-handbill.webp' },
+      { id: 'model-pick', label: 'The Broadside Ballad', kicker: 'IMPECCABLE’S PICK', lineage: 'street-sold ballad sheets', thesis: 'Every release printed as the day’s ballad sheet.', palette: ['#1f1c18', '#efe5d0', '#a33327'], materials: ['woodcut', 'rag paper'], viewport: 'One tall sheet, the newest release as today’s ballad.', risk: 'Also the direction most runs in this category land on.', comp: '.impeccable/mocks/decision/model-pick.webp' },
+      { id: 'challenger-teletext', label: 'Teletext Service', verdict: 'competitive', lineage: 'broadcast teletext magazines', thesis: 'The catalog as a broadcast index: pages, not sections.', palette: ['#0000c0', '#ffff00', '#00c000', '#ffffff'], materials: ['block mosaic', 'phosphor glow'], viewport: 'P100 index page, releases as numbered rows.', case: 'Fuses cleanly: releases map to numbered pages; loses narrowly on clarity.', risk: 'Reads retro-novelty when the grid is not strict.', comp: '.impeccable/mocks/decision/challenger-teletext.webp', hero: 'https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp' },
       { id: 'challenger-microfiche', label: 'Microfiche Reader', verdict: 'declined', lineage: 'library microfiche stations', palette: ['#101418', '#9fb4c0'], materials: ['film grain', 'backlit glass'], case: 'Fuses poorly: listeners do not identify with archival retrieval.', kept: 'Total environmental commitment.', hero: 'https://impeccable.style/worlds/cards/archives-microfiche-reader-hero.webp' },
     ],
     reroll: { registers: ['safer', 'bolder'] },
     canon: true,
-    canonCard: { label: 'The category standard', thesis: 'What this category ships, executed impeccably.', palette: ['#ffffff', '#111827', '#2563eb'], materials: ['clean grid', 'product photography'], viewport: 'The arrangement a visitor expects, at full craft.', risk: 'Indistinguishable from the competition by design.', sketch: '.impeccable/mocks/decision/canon.webp' },
+    canonCard: { label: 'The category standard', thesis: 'What this category ships, executed impeccably.', palette: ['#ffffff', '#111827', '#2563eb'], materials: ['clean grid', 'product photography'], viewport: 'The arrangement a visitor expects, at full craft.', risk: 'Indistinguishable from the competition by design.', comp: '.impeccable/mocks/decision/canon.webp' },
     steer: true,
   }, null, 2));
-  console.log('\nOption ids return verbatim in ANSWER; "reroll" and "canon" are reserved. hero/board/sketch accept URLs or local paths; sketch slots may point at files that do not exist yet (serve first, generate after; the page polls until they land, so never block serving on generation). hero on a challenger is the inspiration it draws from and renders picture-in-picture beside the sketch, never as the promise of the build. verdict routes rendering: "wins" and "competitive" challengers keep full cards, "declined" ones render demoted after them (narrow, quiet, art as a labeled thumb, "Adopt anyway"), with their kept line on the front; the page reorders declined cards to the end on its own. raised on the assigned card renders each donation as a named raise line. Salience parity: when the assigned card declares no sketch (no image generation this round), catalog art on every card demotes to a labeled thumb, so what looks important is the verdict’s call, never rendering luck. canonCard renders the standing exit as a subordinate card with the same anatomy; without it, canon stays a quiet footer action. Include canon only for visual-direction rounds; never present it as your own recommendation. The pick card is a kicker convention, not a field: kicker "MY PICK" on your top-ranked grounded candidate, one at most, never in the lead slot. Every card gets the full anatomy, challengers, canon, and declined included: thesis, palette, materials, viewport, risk; the seed already hands you each challenger’s system rules, so a card with no palette chips is an authoring gap, not a data gap. Keep thesis and each fact to one short sentence: the card front shows thesis, identity, and a two-line risk, while first viewport and the case read on the card back behind the Details chip, so long facts cost the reader a flip, not the page its scanability. A card with no imagery at all has no back; its full read renders on the front, so a text-only round loses nothing. The sketch slot carries the card’s full-fidelity direction comp (the field keeps its wire name for compatibility). Comp aspect follows the surface: portrait at device viewport for native or mobile-first surfaces, landscape otherwise; the page adapts its cards to either. reroll accepts true or { "registers": ["safer", "bolder"] }: the register buttons steer the next hand along the familiar-to-bold axis, the answer carries "register", and you re-run concept-seed with --register <value> for the next round; offer the registers on direction rounds, and never pre-select one. followup: true keeps the table open after a pick for a second round via --update (direction first, then the execution contract); send the next payload immediately, the page is waiting on it.');
+  console.log('\nOption ids return verbatim in ANSWER; "reroll" and "canon" are reserved. hero/board/comp accept URLs or local paths; comp slots may point at files that do not exist yet (serve first, generate after; the page polls until they land, so never block serving on generation). hero on a challenger is the inspiration it draws from and renders picture-in-picture beside the comp, never as the promise of the build. verdict routes rendering: "wins" and "competitive" challengers keep full cards, "declined" ones render demoted after them (narrow, quiet, art as a labeled thumb, "Adopt anyway"), with their kept line on the front; the page reorders declined cards to the end on its own. raised on the assigned card renders each donation as a named raise line. Salience parity: when the assigned card declares no comp (no image generation this round), catalog art on every card demotes to a labeled thumb, so what looks important is the verdict’s call, never rendering luck. canonCard renders the standing exit as a subordinate card with the same anatomy; without it, canon stays a quiet footer action. Include canon only for visual-direction rounds; never present it as your own recommendation. The pick card is a kicker convention, not a field: kicker "IMPECCABLE’S PICK" on your top-ranked grounded candidate, one at most, never in the lead slot. Every card gets the full anatomy, challengers, canon, and declined included: thesis, palette, materials, viewport, risk; the seed already hands you each challenger’s system rules, so a card with no palette chips is an authoring gap, not a data gap. Keep thesis and each fact to one short sentence: the card front shows thesis, identity, and a two-line risk, while first viewport and the case read on the card back behind the Details chip, so long facts cost the reader a flip, not the page its scanability. A card with no imagery at all has no back; its full read renders on the front, so a text-only round loses nothing. The comp slot carries the card’s full-fidelity direction comp (the legacy key "sketch" is accepted as an alias). Comp aspect follows the surface: portrait at device viewport for native or mobile-first surfaces, landscape otherwise; the page adapts its cards to either. reroll accepts true or { "registers": ["safer", "bolder"] }: the register buttons steer the next hand along the familiar-to-bold axis, the answer carries "register", and you re-run concept-seed with --register <value> for the next round; offer the registers on direction rounds, and never pre-select one. followup: true keeps the table open after a pick for a second round via --update (direction first, then the execution contract); send the next payload immediately, the page is waiting on it.');
   process.exit(0);
 }
 
@@ -322,10 +322,10 @@ function loadRound(json) {
     localImages.push(abs);
     return `/img/${localImages.length - 1}`;
   };
-  // Sketches stream in after the page is served, so their slots register
+  // Comps stream in after the page is served, so their slots register
   // whether or not the file exists yet; /img answers 404 until it lands and
-  // the page polls the slot. Remote sketch URLs pass through untouched.
-  const sketchSrc = (value) => {
+  // the page polls the slot. Remote comp URLs pass through untouched.
+  const compSrc = (value) => {
     if (!value) return null;
     if (/^https?:\/\//.test(value)) return value;
     localImages.push(path.resolve(value));
@@ -336,7 +336,7 @@ function loadRound(json) {
     ...option,
     heroSrc: imageSrc(option.hero),
     boardSrc: imageSrc(option.board),
-    sketchSrc: sketchSrc(option.sketch),
+    compSrc: compSrc(option.comp ?? option.sketch),
   });
   options = parsed.options.map(decorate);
   // The verdict routes rendering: full cards first, then the canon, then the
@@ -374,12 +374,12 @@ function page() {
   // assigned card would let rendering luck outvote the weighing: users click
   // the colorful thing. Declined cards are thumb-only regardless; the verdict
   // demoted them, and a full-bleed hero would promote them right back.
-  const identityRound = !(options[0] && (options[0].sketchSrc || options[0].heroSrc || options[0].boardSrc));
-  // A declined card never renders a full media face, sketch included: even a
-  // declared sketch would buy back the salience the verdict took away.
-  const faceSketch = (option) => demoted(option) ? null : option.sketchSrc;
-  const thumbOnly = (option) => !faceSketch(option) && Boolean(option.heroSrc || option.boardSrc) && (demoted(option) || identityRound);
-  const hasMedia = (option) => Boolean(faceSketch(option) || ((option.heroSrc || option.boardSrc) && !thumbOnly(option)));
+  const identityRound = !(options[0] && (options[0].compSrc || options[0].heroSrc || options[0].boardSrc));
+  // A declined card never renders a full media face, comp included: even a
+  // declared comp would buy back the salience the verdict took away.
+  const faceComp = (option) => demoted(option) ? null : option.compSrc;
+  const thumbOnly = (option) => !faceComp(option) && Boolean(option.heroSrc || option.boardSrc) && (demoted(option) || identityRound);
+  const hasMedia = (option) => Boolean(faceComp(option) || ((option.heroSrc || option.boardSrc) && !thumbOnly(option)));
   // The back exists to keep long facts off a card whose front is an image;
   // a card with no art has no flip chip to reach it, so it gets no back and
   // the full read lives on the front instead.
@@ -402,15 +402,16 @@ function page() {
     // generous hand cannot blow the card out of proportion.
     if (Array.isArray(option.raised) && option.raised.length) {
       const nameOf = (id) => options.find((o) => o.id === id)?.label || String(id ?? '');
-      const raiseLines = option.raised.slice(0, 6).map((r) => `<p class="raise"><span class="fact-label">Raised by ${esc(nameOf(r.from))}</span>${esc(r.raise || r.kept || '')}</p>`);
+      const raiseLines = option.raised.slice(0, 6).map((r) => `<p class="raise"><span class="fact-label">From ${esc(nameOf(r.from))}</span>${esc(r.raise || r.kept || '')}</p>`);
+      const raisesHead = (count) => `<div class="raises-head"><span class="fact-label">Improved by Impeccable's worlds</span>${count > 1 ? `<span class="raises-count" data-raises-count>1/${count}</span>` : ''}</div>`;
       if (raiseLines.length > 1) {
-        rows.push(`<div class="raises raises-cycle" role="button" tabindex="0" title="Click or press Enter to see the next raise" aria-label="Raised by the hand; activate to see the next raise">
-              <div class="raises-head"><span class="fact-label">Raised by the hand</span><span class="raises-count" data-raises-count>1/${raiseLines.length}</span></div>
+        rows.push(`<div class="raises raises-cycle" role="button" tabindex="0" title="Click or press Enter for the next improvement" aria-label="How Impeccable's worlds improved this direction; activate to see the next improvement">
+              ${raisesHead(raiseLines.length)}
               ${raiseLines.join('')}
               <span class="sr-live" aria-live="polite"></span>
             </div>`);
       } else {
-        rows.push(`<div class="raises">${raiseLines[0]}</div>`);
+        rows.push(`<div class="raises">${raisesHead(1)}${raiseLines[0]}</div>`);
       }
     }
     // Demoted art stays reachable as a labeled thumb: the catalog world
@@ -421,7 +422,7 @@ function page() {
     }
     // The front carries only what the choice needs: thesis, identity, and the
     // honest risk clamped to two lines. First viewport and the case read on
-    // the card's back; once the sketch lands, the first viewport is a picture.
+    // the card's back; once the comp lands, the first viewport is a picture.
     // With no art there is no back, so the full read fills the room the
     // image would have taken.
     if (hasMedia(option)) {
@@ -450,18 +451,18 @@ function page() {
             </figure>` : '';
     const details = hasBack(option) ? flipChip('Details') : '';
     // Thumb-only art renders inside the body via anatomy(), never as a face,
-    // and a declined card's sketch slot is ignored outright.
+    // and a declined card's comp slot is ignored outright.
     if (thumbOnly(option)) return '';
-    if (faceSketch(option)) {
-      return `<div class="media sketching" data-sketch="${esc(option.sketchSrc)}">
-            <div class="shimmer"><span class="sketch-note">rendering&hellip;</span></div>
-            <img class="sketch" alt="" hidden>
+    if (faceComp(option)) {
+      return `<div class="media comp-pending" data-comp="${esc(option.compSrc)}">
+            <div class="shimmer"><span class="comp-note">rendering&hellip;</span></div>
+            <img class="comp" alt="" hidden>
             ${inspiration}
             <div class="chips">${expandChip}${details}</div>
           </div>`;
     }
     if (option.heroSrc || option.boardSrc) {
-      // Without a sketch the catalog art is the card's face; it stays a
+      // Without a comp the catalog art is the card's face; it stays a
       // labeled reference so it never reads as the promise of the build.
       return `<div class="media" title="Inspiration: the world this direction draws from. Your page will not look like this image.">
             <img src="${esc(option.heroSrc || option.boardSrc)}" alt="">
@@ -526,9 +527,12 @@ function page() {
     --ks-font-display: "Alumni Sans", "Albert Sans", Arial, sans-serif;
     --ks-font: "Albert Sans", "Avenir Next", "Helvetica Neue", Arial, system-ui, sans-serif;
     --ks-mono: "SFMono-Regular", "Roboto Mono", "JetBrains Mono", Consolas, monospace;
+    /* One inset shared by the content column, the deck's snap padding, and
+       the sticky footer, so all three align on the same 90rem column. */
+    --page-inset: max(clamp(1rem, 5vw, 4rem), calc((100vw - 90rem) / 2));
   }
   * { box-sizing: border-box; margin: 0; }
-  body { background: var(--ks-lacquer); color: var(--ks-text); font: 15px/1.55 var(--ks-font); padding: 1.8rem clamp(1rem, 5vw, 4rem) 2rem; min-height: 100dvh; display: flex; flex-direction: column; overflow-x: clip; }
+  body { background: var(--ks-lacquer); color: var(--ks-text); font: 15px/1.55 var(--ks-font); padding: 1.8rem clamp(1rem, 5vw, 4rem) 0; min-height: 100dvh; display: flex; flex-direction: column; overflow-x: clip; }
   #ambient { position: fixed; inset: -40px; z-index: 0; background-size: cover; background-position: center; filter: blur(34px) saturate(1.05); opacity: 0; transition: opacity .55s ease, background-image .2s; pointer-events: none; }
   #scrim { position: fixed; inset: 0; z-index: 0; background: linear-gradient(180deg, oklch(7% 0.006 95 / 0.62), oklch(7% 0.006 95 / 0.78)); pointer-events: none; }
   header, main, footer { position: relative; z-index: 1; }
@@ -552,12 +556,24 @@ function page() {
   .deck-shell { position: relative; width: 100vw; margin-left: calc(50% - 50vw); }
   /* One row in a wide viewport, one column in a tall one; the deck scrolls on
      its axis with snap points and the arrows page it card by card. */
-  .grid { --deck-inset: max(clamp(1rem, 5vw, 4rem), calc((100vw - 90rem) / 2)); display: flex; gap: 1.6rem; width: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 6px var(--deck-inset); scroll-padding-inline: var(--deck-inset); align-items: stretch; }
+  .grid { --deck-inset: var(--page-inset); display: flex; gap: 1.6rem; width: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 6px var(--deck-inset); scroll-padding-inline: var(--deck-inset); align-items: stretch; }
   .grid::-webkit-scrollbar { display: none; }
-  /* Wide enough that the sketch carries the card: at 27vw the imagery read
+  /* Wide enough that the comp carries the card: at 27vw the imagery read
      as a thumbnail above a column of copy, and the copy won the attention
-     contest the sketch is supposed to win. */
+     contest the comp is supposed to win. */
   .grid > .card { flex: 0 0 clamp(24rem, 34vw, 34rem); scroll-snap-align: center; }
+  /* Short landscape viewports (13-inch laptops): header, a 34vw card, and the
+     footer do not fit 800px of height, so the headline compacts and the deck
+     narrows. Height is the axis that gives; the sticky footer keeps the
+     round's verbs on screen while a too-tall card scrolls. */
+  @media (min-aspect-ratio: 1/1) and (max-height: 900px) {
+    body { padding-top: 1.1rem; }
+    h1 { font-size: clamp(2rem, 3.4vw, 2.9rem); }
+    .question { margin-top: .45rem; }
+    .stage { gap: 1rem; }
+    .grid > .card { flex-basis: clamp(20rem, 27vw, 27rem); }
+    .grid > .card.declined { flex-basis: clamp(13rem, 18vw, 18rem); }
+  }
   .nav { position: absolute; z-index: 6; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: oklch(7% 0.006 95 / 0.78); border: 1px solid var(--ks-rule); color: var(--ks-kinpaku); cursor: pointer; backdrop-filter: blur(6px); transition: border-color .2s, color .2s, opacity .2s; }
   .nav:hover { border-color: var(--ks-kinpaku-deep); color: var(--ks-kinpaku-pale); }
   .nav[disabled] { opacity: .25; cursor: default; }
@@ -588,6 +604,10 @@ function page() {
        shrink a declined card to content WIDTH, not height, so it stretches
        like every other card and its height is already its own. */
     .grid > .card.declined { align-self: stretch; }
+    /* The sticky bar is a wide-viewport fix. Here it would sit over the
+       deck's More pager and cost a third of a phone screen, and the deck
+       already scrolls internally, so the footer stays in the page flow. */
+    footer { position: static; width: auto; margin: 1rem 0 0; padding: .7rem 0 1.2rem; background: transparent; border-top: 0; backdrop-filter: none; }
   }
   .card { position: relative; perspective: 1400px; transform: rotate(var(--fan, 0deg)); transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
   .card:hover { transform: rotate(0deg) translateY(-4px); }
@@ -611,7 +631,7 @@ function page() {
      region entirely instead of reserving a blank 16:9 void. */
   .face.text-only .kicker { position: static; align-self: flex-start; margin: 14px 0 0 14px; }
   .face.text-only .body { padding-top: 12px; }
-  /* 16/10 matches the landscape sketch frame; portrait art overrides the
+  /* 16/10 matches the landscape comp frame; portrait art overrides the
      slot with its own exact ratio at load (see the load listener), and the
      deck narrows so portrait cards line up side by side. */
   .media { position: relative; width: 100%; aspect-ratio: 16/10; flex: none; }
@@ -647,14 +667,14 @@ function page() {
   .body.back-body { overflow-y: auto; flex: 1; scrollbar-width: thin; }
   /* Inspiration rides picture-in-picture: the catalog world explains where the
      direction comes from without promising what the build will look like. */
-  /* Hovering the inspiration takes over the whole media region; the sketch is
+  /* Hovering the inspiration takes over the whole media region; the comp is
      the promise, the inspiration is a glance, so the glance must cost nothing. */
   .pip { position: absolute; z-index: 2; left: 10px; bottom: 10px; margin: 0; width: 84px; height: 64px; border: 1px solid var(--ks-rule); border-radius: 6px; overflow: hidden; background: var(--ks-lacquer); cursor: zoom-in; transition: left .35s cubic-bezier(.16,1,.3,1), bottom .35s cubic-bezier(.16,1,.3,1), width .35s cubic-bezier(.16,1,.3,1), height .35s cubic-bezier(.16,1,.3,1), border-radius .35s ease; box-shadow: 0 6px 18px oklch(0% 0 0 / 0.45); }
   .pip img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .pip figcaption { position: absolute; left: 0; right: 0; bottom: 0; font-family: var(--ks-mono); font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: var(--ks-text); text-align: center; padding: 3px 0 4px; background: oklch(7% 0.006 95 / 0.72); backdrop-filter: blur(3px); }
   .pip:hover { left: 0; bottom: 0; width: 100%; height: 100%; border-radius: 0; z-index: 3; }
-  .sketch-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--ks-mono); font-size: .66rem; letter-spacing: .22em; text-transform: uppercase; color: var(--ks-text-faint); }
-  /* Catalog art standing in for a sketchless card is a reference, and says so
+  .comp-note { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--ks-mono); font-size: .66rem; letter-spacing: .22em; text-transform: uppercase; color: var(--ks-text-faint); }
+  /* Catalog art standing in for a comp-less card is a reference, and says so
      on its face; the same pill later carries "artwork unavailable". */
   .media-label { position: absolute; z-index: 2; left: 10px; bottom: 10px; margin: 0; font-family: var(--ks-mono); font-size: .5rem; letter-spacing: .2em; text-transform: uppercase; color: var(--ks-text); padding: 3px 8px 4px; background: oklch(7% 0.006 95 / 0.72); border: 1px solid var(--ks-rule); border-radius: 4px; backdrop-filter: blur(3px); }
   /* Art that never arrives collapses to the card's own palette (painted
@@ -666,15 +686,15 @@ function page() {
   .media.unavailable::after { content: ""; position: absolute; inset: 0; z-index: 1; background: oklch(10% 0.008 95 / 0.45); pointer-events: none; }
   .media.unavailable .chips { z-index: 2; }
   /* A stand-in is honest about being one: dimmed, labeled, and replaced by
-     the real sketch whenever it lands. */
-  .media.stand-in img.sketch { filter: brightness(.72) saturate(.85); }
+     the real comp whenever it lands. */
+  .media.stand-in img.comp { filter: brightness(.72) saturate(.85); }
   .media.stand-in .pip { display: none; }
   .stand-in-label { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; margin: 0; font-family: var(--ks-mono); font-size: .56rem; letter-spacing: .2em; text-transform: uppercase; color: var(--ks-text); text-align: center; padding: 4px 0 5px; background: oklch(7% 0.006 95 / 0.78); backdrop-filter: blur(3px); }
-  .media.sketching { position: relative; }
-  .media.sketching .shimmer { position: absolute; inset: 0; }
-  .media img.sketch { position: relative; z-index: 1; }
+  .media.comp-pending { position: relative; }
+  .media.comp-pending .shimmer { position: absolute; inset: 0; }
+  .media img.comp { position: relative; z-index: 1; }
   /* The generic .media img display:block would defeat [hidden] and float an
-     empty block over the shimmer; an unloaded sketch must truly not render. */
+     empty block over the shimmer; an unloaded comp must truly not render. */
   .media img[hidden] { display: none; }
   /* Declined challengers: the weighing demoted them, so the card is narrower
      and quieter, its catalog art rides as a labeled thumb in the body, and
@@ -695,17 +715,19 @@ function page() {
   .inspo { position: relative; flex: none; margin: 2px 0; width: 104px; height: 64px; border: 1px solid var(--ks-rule); border-radius: 6px; overflow: hidden; cursor: zoom-in; background: var(--ks-lacquer); }
   .inspo img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .inspo figcaption { position: absolute; left: 0; right: 0; bottom: 0; font-family: var(--ks-mono); font-size: .48rem; letter-spacing: .16em; text-transform: uppercase; color: var(--ks-text); text-align: center; padding: 2px 0 3px; background: oklch(7% 0.006 95 / 0.72); }
-  /* Raises: the donations the assigned direction took from the hand it beat,
-     each named for its donor. Patina, not kinpaku: a raise is provenance. */
-  .raises { display: flex; flex-direction: column; gap: 4px; margin: 2px 0; }
-  .raise { font-size: .78rem; color: var(--ks-text-muted); line-height: 1.45; border-left: 2px solid var(--ks-patina); padding-left: 8px; }
+  /* Raises: the improvements the dealt worlds donated to the assigned
+     direction, each named for its donor world. Patina, not kinpaku:
+     provenance, not a call to action. A quiet contained panel, never an
+     accent side-tab. */
+  .raises { display: flex; flex-direction: column; gap: 4px; margin: 2px 0; padding: 7px 10px 8px; background: oklch(70% 0.12 188 / 0.06); border: 1px solid oklch(70% 0.12 188 / 0.22); border-radius: 8px; }
+  .raise { font-size: .78rem; color: var(--ks-text-muted); line-height: 1.45; }
   .raise .fact-label { color: var(--ks-patina); }
-  /* Several raises cycle instead of stacking: one visible at a time, a
+  /* Several kept ideas cycle instead of stacking: one visible at a time, a
      counter for the rest, the whole block advances on click. */
-  .raises-cycle { cursor: pointer; border-radius: 6px; }
-  .raises-cycle .raise { display: none; border-left: none; padding-left: 0; }
+  .raises-cycle { cursor: pointer; transition: border-color .2s ease; }
+  .raises-cycle:hover { border-color: oklch(70% 0.12 188 / 0.45); }
+  .raises-cycle .raise { display: none; }
   .raises-cycle .raise.active { display: block; }
-  .raises-cycle { border-left: 2px solid var(--ks-patina); padding-left: 8px; }
   .raises-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .raises-head .fact-label { color: var(--ks-patina); }
   .raises-count { font-family: var(--ks-mono); font-size: .58rem; letter-spacing: .14em; color: var(--ks-text-faint); }
@@ -721,7 +743,10 @@ function page() {
   .card.canon button.choose:hover { border-color: var(--ks-text-muted); background: var(--ks-graphite-2); }
   button.choose { margin-top: auto; align-self: start; background: var(--ks-kinpaku); color: var(--ks-dark-ink); border: 0; font-family: var(--ks-font); font-size: 1rem; font-weight: 500; line-height: 1.35; padding: 10px 38px; border-radius: 6px; cursor: pointer; transition: background .15s; }
   button.choose:hover { background: var(--ks-kinpaku-pale); }
-  footer { width: 100%; max-width: 90rem; margin: 1.6rem auto 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  /* The round's verbs stay reachable on short viewports: the footer is a
+     full-bleed bar stuck to the viewport bottom and the deck scrolls under
+     it. Same inset as the content column, so the controls stay aligned. */
+  footer { position: sticky; bottom: 0; z-index: 10; width: 100vw; margin: 1.2rem calc(50% - 50vw) 0; padding: .7rem var(--page-inset) calc(.7rem + env(safe-area-inset-bottom, 0px)); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; background: oklch(7% 0.006 95 / 0.82); backdrop-filter: blur(10px); border-top: 1px solid var(--ks-rule); }
   #steer { flex: 1; min-width: 16rem; background: var(--ks-lacquer-raised); color: var(--ks-text); border: 1px solid var(--ks-rule); border-radius: 7px; padding: .6rem .85rem; font: inherit; }
   #steer:focus { outline: none; border-color: var(--ks-patina); }
   .reroll-btn { display: inline-flex; align-items: center; align-self: stretch; gap: 8px; padding: 0 16px; font-family: var(--ks-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ks-kinpaku); background: transparent; border: 1px solid var(--ks-rule); border-radius: 6px; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
@@ -822,7 +847,7 @@ function page() {
       if (count) count.textContent = (at + 1) + '/' + raises.length;
       // Screen readers hear the raise they just advanced to; the initial
       // render stays quiet so page load does not narrate every card.
-      if (announce && live) live.textContent = 'Raise ' + (at + 1) + ' of ' + raises.length + ': ' + (raises[at]?.textContent || '');
+      if (announce && live) live.textContent = 'Improvement ' + (at + 1) + ' of ' + raises.length + ': ' + (raises[at]?.textContent || '');
     };
     show(false);
     const advance = (e) => { e.stopPropagation(); at = (at + 1) % raises.length; show(true); };
@@ -863,22 +888,22 @@ function page() {
     }));
   }
 
-  // Sketches stream in after the deal: poll each slot until the file lands,
+  // Comps stream in after the deal: poll each slot until the file lands,
   // then swap the shimmer for the image. Generation is genuinely slow and a
   // sequential batch puts the last card many minutes out, so patience is the
   // default: a slot only shows its inspiration as a stand-in when it has
   // waited four minutes AND nothing has landed anywhere for four minutes, the
-  // stand-in is labeled as such, and polling continues so the real sketch
+  // stand-in is labeled as such, and polling continues so the real comp
   // still swaps in whenever it arrives. Progress anywhere resets patience.
   const landTracker = { last: Date.now() };
-  document.querySelectorAll('.media.sketching').forEach(m => {
-    const url = m.dataset.sketch;
-    const img = m.querySelector('img.sketch');
-    const note = m.querySelector('.sketch-note');
+  document.querySelectorAll('.media.comp-pending').forEach(m => {
+    const url = m.dataset.comp;
+    const img = m.querySelector('img.comp');
+    const note = m.querySelector('.comp-note');
     const started = Date.now();
     // A live elapsed count is the difference between "working" and "frozen".
     const tick = setInterval(() => { if (note) note.textContent = 'rendering · ' + Math.round((Date.now() - started) / 1000) + 's'; }, 1000);
-    const settle = () => { clearInterval(tick); m.classList.remove('sketching', 'stand-in'); m.querySelector('.shimmer')?.remove(); m.querySelector('.stand-in-label')?.remove(); };
+    const settle = () => { clearInterval(tick); m.classList.remove('comp-pending', 'stand-in'); m.querySelector('.shimmer')?.remove(); m.querySelector('.stand-in-label')?.remove(); };
     const standIn = () => {
       const pip = m.querySelector('.pip img');
       if (!pip || m.classList.contains('stand-in')) return;
@@ -910,7 +935,7 @@ function page() {
   // slots are excluded; their polling owns the wait.
   const artFailed = (img) => {
     const m = img.closest('.media');
-    if (!m || m.classList.contains('sketching') || m.classList.contains('unavailable')) return;
+    if (!m || m.classList.contains('comp-pending') || m.classList.contains('unavailable')) return;
     m.classList.add('unavailable');
     const colors = [...(img.closest('.card')?.querySelectorAll('.swatches i') || [])].map(i => i.style.background).filter(Boolean);
     if (colors.length) m.style.background = 'linear-gradient(135deg, ' + colors.map((c, i) => c + ' ' + Math.round(i * 100 / colors.length) + '% ' + Math.round((i + 1) * 100 / colors.length) + '%').join(', ') + ')';
@@ -923,7 +948,7 @@ function page() {
     label.textContent = 'artwork unavailable';
     m.appendChild(label);
   };
-  document.querySelectorAll('.media:not(.sketching) > img').forEach(img => {
+  document.querySelectorAll('.media:not(.comp-pending) > img').forEach(img => {
     if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) artFailed(img);
     else img.addEventListener('error', () => artFailed(img), { once: true });
   });
@@ -1129,7 +1154,7 @@ const server = http.createServer((req, res) => {
         ...(isReroll && (parsed.register === 'safer' || parsed.register === 'bolder') ? { register: parsed.register } : {}),
         ...(followupOpen ? { followup: true } : {}),
         ...(chosen?.hero || chosen?.board ? { hero: chosen.hero ?? null, board: chosen.board ?? null } : {}),
-        ...(chosen?.sketch ? { sketch: chosen.sketch } : {}),
+        ...((chosen?.comp ?? chosen?.sketch) ? { comp: chosen.comp ?? chosen.sketch } : {}),
       });
       if (detachedKey) {
         fs.mkdirSync(QUESTION_DIR, { recursive: true });
