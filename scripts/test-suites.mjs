@@ -26,7 +26,7 @@ export const SUITES = {
     triggers: [
       ...COMMON_INFRA_PATTERNS,
       /^scripts\/(?!benchmark-detector|build-browser-detector|build-extension)/,
-      /^skill\/(SKILL\.src\.md|agents\/|reference\/|scripts\/(cleanup-deprecated|comp-diff|comp-spec|build-phase|font-match|data\/font-index|concept-seed|context|context-signals|critique-storage|design-parser|doctor|hook|impeccable-paths|is-generated|lib\/(artifact-schema|png|raster|image-metrics|font-fingerprint|font-index|hero-checks|composition-catalog|concept-catalog|provider|staleness|staleness-deep|staleness-notice|surface-briefs|target-slug|template-extensions)|pin|surface-brief))/,
+      /^skill\/(SKILL\.src\.md|agents\/|reference\/|scripts\/(cleanup-deprecated|comp-diff|comp-spec|build-phase|font-match|data\/font-index|concept-seed|generate-image|context|context-signals|critique-storage|design-parser|doctor|hook|impeccable-paths|is-generated|lib\/(artifact-schema|png|raster|image-metrics|font-fingerprint|font-index|hero-checks|composition-catalog|concept-catalog|provider|staleness|staleness-deep|staleness-notice|surface-briefs|target-slug|template-extensions)|pin|surface-brief))/,
       /^README(\.npm)?\.md$/,
       /^cli\/bin\//,
     ],
@@ -46,6 +46,7 @@ export const SUITES = {
           'tests/skills-cli.test.js',
           'tests/validate-plugin-versions.test.js',
           'tests/validate-plugin-manifest.test.js',
+          'tests/plugin-paths.test.js',
         ],
       },
       {
@@ -54,6 +55,7 @@ export const SUITES = {
           'tests/ci-test-plan.test.mjs',
           'tests/cli-args.test.mjs',
           'tests/concept-seed.test.mjs',
+          'tests/generate-image-embed.test.mjs',
           'tests/comp-diff.test.mjs',
           'tests/build-phase.test.mjs',
           'tests/font-match.test.mjs',
@@ -73,6 +75,7 @@ export const SUITES = {
           'tests/doctor.test.mjs',
           'tests/staleness.test.mjs',
           'tests/skill-reference.test.mjs',
+          'tests/readme-gitignore.test.mjs',
           'tests/target-args.test.mjs',
           'tests/surface-brief.test.mjs',
           'tests/template-extensions.test.mjs',
@@ -231,6 +234,7 @@ export const SUITES = {
       /^skill\/agents\//,
       /^scripts\/build\.js$/,
       /^scripts\/lib\/validate-plugin-manifest\.js$/,
+      /^scripts\/lib\/plugin-paths\.js$/,
       /^tests\/plugin-e2e\.test\.mjs$/,
     ],
     commands: [
