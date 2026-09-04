@@ -103,10 +103,18 @@ export const SUITES = {
     description: 'Extension packaging checks (the rule logic itself is covered by the crate tests and the oracle).',
     triggers: [
       ...COMMON_INFRA_PATTERNS,
-      /^extension\/(background|content|detector|devtools|offscreen|popup|manifest\.json)/,
+      /^extension\/(background|content|detector|devtools|offscreen|popup|shared|manifest\.json)/,
       /^scripts\/build-extension\.js$/,
       /^browser-bundle\//,
-      /^crates\/(core|foundation|wasm|xtask)\//,
+      // Everything `cargo xtask bundle` reads: the rules and the registry
+      // rows (core, foundation), the wasm module (wasm), the assembly and the
+      // registry serialization (bundle), and the task itself (xtask). Leaving
+      // one out means a PR that changes what the bundle emits never rebuilds
+      // it, and the tracked-output check in ci.yml then compares a committed
+      // artifact against an untouched tree and passes on stale bytes.
+      /^crates\/(bundle|core|foundation|wasm|xtask)\//,
+      // The tracked artifacts themselves, so a hand-edit is regenerated over.
+      /^crates\/live\/assets\//,
     ],
     commands: [
       {
