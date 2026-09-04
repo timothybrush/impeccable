@@ -406,22 +406,22 @@ describe('live-browser source contracts', () => {
     );
     assert.match(
       SOURCE,
-      /if \(hasFrameworkHmrOwnership\(lateWrapper\)\) \{[\s\S]{0,900}?location\.reload\(\);[\s\S]{0,100}?return;[\s\S]{0,150}?releaseDiscardedStaticWrapper\(lateWrapper, cleanupSessionId\)/,
+      /if \(hasFrameworkHmrOwnership\(lateWrapper\)\) \{[\s\S]{0,1100}?location\.reload\(\);[\s\S]{0,100}?return;[\s\S]{0,150}?releaseDiscardedStaticWrappers\(cleanupSessionId, lateWrappers\)/,
       'discard cleanup must use a reload grace fallback before replacing a framework-owned wrapper',
     );
     assert.match(
       SOURCE,
-      /function releaseDiscardedStaticWrapper\(wrapper, sessionId\)[\s\S]{0,400}?replaceChild\(content, wrapper\)/,
+      /function releaseDiscardedStaticWrapper\(wrapper\)[\s\S]{0,400}?replaceChild\(content, wrapper\)/,
       'only the static-wrapper release helper may structurally restore discarded DOM',
     );
     assert.match(
       SOURCE,
-      /if \(hasFrameworkHmrOwnership\(lateWrapper\)\) \{[\s\S]{0,700}?removeDiscardStateStylesheet\(cleanupSessionId\);[\s\S]{0,120}?location\.reload\(\);/,
+      /if \(hasFrameworkHmrOwnership\(lateWrapper\)\) \{[\s\S]{0,900}?removeDiscardStateStylesheet\(cleanupSessionId\);[\s\S]{0,250}?location\.reload\(\);/,
       'discard must keep its original-visibility stylesheet until the HMR grace window ends',
     );
     assert.match(
       SOURCE,
-      /const recoverySuperseded = deferredRecoverySuperseded\(cleanupSessionId, cleanupRevision\);[\s\S]{0,500}?if \(recoverySuperseded\) \{[\s\S]{0,250}?watchForDiscardedFrameworkWrapperRemoval\(cleanupSessionId\)[\s\S]{0,150}?releaseDiscardedStaticWrapper\(lateWrapper, cleanupSessionId\)[\s\S]{0,80}?return;/,
+      /const recoverySuperseded = deferredRecoverySuperseded\(cleanupSessionId, cleanupRevision\);[\s\S]{0,700}?if \(recoverySuperseded\) \{[\s\S]{0,250}?watchForDiscardedFrameworkWrapperRemoval\(cleanupSessionId\)[\s\S]{0,150}?releaseDiscardedStaticWrappers\(cleanupSessionId, lateWrappers\)[\s\S]{0,80}?return;/,
       'discard cleanup and its reload grace callback must yield to a newer Live session',
     );
     assert.match(
@@ -436,7 +436,7 @@ describe('live-browser source contracts', () => {
     );
     assert.match(
       SOURCE,
-      /setTimeout\(function\(\) \{[\s\S]{0,300}?const staleWrapper = document\.querySelector[\s\S]{0,250}?deferredRecoverySuperseded\(cleanupSessionId, cleanupRevision\)[\s\S]{0,250}?watchForDiscardedFrameworkWrapperRemoval\(cleanupSessionId\)[\s\S]{0,100}?return;[\s\S]{0,100}?removeDiscardStateStylesheet\(cleanupSessionId\);[\s\S]{0,100}?location\.reload\(\);/,
+      /setTimeout\(function\(\) \{[\s\S]{0,300}?const staleWrappers = discardedWrappers\(cleanupSessionId\);[\s\S]{0,250}?deferredRecoverySuperseded\(cleanupSessionId, cleanupRevision\)[\s\S]{0,250}?watchForDiscardedFrameworkWrapperRemoval\(cleanupSessionId\)[\s\S]{0,100}?return;[\s\S]{0,100}?removeDiscardStateStylesheet\(cleanupSessionId\);[\s\S]{0,250}?location\.reload\(\);/,
       'framework discard recovery may observe safe HMR cleanup but must not reload replacement work',
     );
     assert.match(
@@ -470,7 +470,7 @@ describe('live-browser source contracts', () => {
     assert.match(recovery, /if \(staleWrapper\) location\.reload\(\);/);
     assert.match(
       SOURCE,
-      /function resumeSession\(recoveryRevision = liveInteractionRevision\)[\s\S]{0,250}?\[data-impeccable-carbonize\][\s\S]{0,180}?scheduleHandledRuntimeWrapperReload\(runtimeWrapper, recoveryRevision\)/,
+      /function resumeSession\(recoveryRevision = liveInteractionRevision, opts = \{\}\)[\s\S]{0,700}?\[data-impeccable-carbonize\][\s\S]{0,180}?scheduleHandledRuntimeWrapperReload\(runtimeWrapper, recoveryRevision\)/,
       'resume must inspect handled carbonize wrappers before clearing handled state',
     );
     assert.match(
@@ -526,8 +526,237 @@ describe('live-browser source contracts', () => {
     );
     assert.match(
       SOURCE,
-      /const deferredResumeRevision = liveInteractionRevision;[\s\S]{0,350}?const scout = new MutationObserver[\s\S]{0,350}?resumeSession\(deferredResumeRevision\)/,
-      'the deferred-wrapper scout must retain its originating interaction revision',
+      /const deferredResumeRevision = liveInteractionRevision;[\s\S]{0,350}?const scout = new MutationObserver[\s\S]{0,400}?resumeSession\(deferredResumeRevision, \{ reason: 'browser_resumed_deferred_wrapper' \}\)/,
+      'the deferred-wrapper scout must retain its originating interaction revision and name itself in the journal',
+    );
+  });
+
+  it('finishes the cycling transition when the resume is the arrival (#719)', () => {
+    // The server's generation preflight runs live-wrap with
+    // --defer-source-write, so the wrapper and every variant reach the DOM in
+    // one HMR batch. The deferred-wrapper scout is constructed at init, the
+    // variant MutationObserver at Go, and observer callbacks run in
+    // construction order, so on that batch the scout resumes first and
+    // resumeSession IS the transition into CYCLING. It has to finish the same
+    // transition the observer would have: leaving the generating shader up
+    // paints a frozen capture of the original over a DOM that already holds
+    // the variants, which is the stuck loader from issue #719.
+    const resumeStart = SOURCE.indexOf('function resumeSession(');
+    const resumeEnd = SOURCE.indexOf('\n  //', resumeStart);
+    const resume = SOURCE.slice(resumeStart, resumeEnd);
+    assert.match(
+      resume,
+      /if \(state === 'CYCLING'\) \{[\s\S]{0,200}?hideShaderOverlay\(\);/,
+      'a resume into CYCLING must take the generating shader down',
+    );
+    assert.match(
+      resume,
+      /if \(state === 'CYCLING'\) \{[\s\S]{0,700}?refreshParamsPanel\(\);/,
+      'a resume into CYCLING must still rebuild the params panel',
+    );
+    // Only variants_progress|variants_ready count as publication progress, so
+    // a resume that already holds every variant has to report one of them or
+    // the server never learns the generation was published.
+    assert.match(
+      resume,
+      /queueCheckpoint\(resumeReason\);[\s\S]{0,500}?sendCheckpoint\('variants_ready'\)/,
+      'a complete resume must report variants_ready, not only browser_resumed',
+    );
+  });
+
+  it('unwinds every wrapper a discard hid, not just the first (#719)', () => {
+    // Bugbot on #720: the non-restoreOriginal discard hides every matching
+    // wrapper, so the delayed fallback has to release the same set. Releasing
+    // the first match left the other mapped items at display:none with their
+    // original content never restored, on exactly the static and missed-HMR
+    // flows the fallback exists for. The e2e fixtures cannot cover this:
+    // hasFrameworkHmrOwnership is true for every React, Vue, and Svelte
+    // fixture, so they all take the watcher path instead.
+    const cleanupAt = SOURCE.indexOf('function cleanup(options)');
+    assert.ok(cleanupAt > 0, 'cleanup must exist');
+    const cleanup = SOURCE.slice(cleanupAt, SOURCE.indexOf('\n  //', cleanupAt));
+
+    assert.match(
+      cleanup,
+      /const discardWrappers = discardedWrappers\(cleanupSessionId\);[\s\S]{0,260}?for \(const discardWrapper of discardWrappers\) discardWrapper\.style\.display = 'none';/,
+      'the hide must cover every wrapper for the session',
+    );
+    assert.match(
+      cleanup,
+      /const lateWrappers = discardedWrappers\(cleanupSessionId\);[\s\S]{0,120}?if \(lateWrappers\.length === 0\)/,
+      'the fallback must look at the same set the hide covered',
+    );
+    assert.doesNotMatch(
+      cleanup,
+      /releaseDiscardedStaticWrapper\(/,
+      'cleanup must go through the plural release so every hidden wrapper is unwound',
+    );
+    for (const call of [...cleanup.matchAll(/releaseDiscardedStaticWrappers\([^)]*\)/g)].map((m) => m[0])) {
+      assert.match(call, /lateWrappers/, `${call} must release the captured set`);
+    }
+    assert.ok(
+      [...cleanup.matchAll(/releaseDiscardedStaticWrappers\(/g)].length === 2,
+      'both the superseded and the plain static branch must release',
+    );
+
+    const pluralAt = SOURCE.indexOf('function releaseDiscardedStaticWrappers(sessionId, wrappers)');
+    assert.ok(pluralAt > 0, 'releaseDiscardedStaticWrappers must exist');
+    const plural = SOURCE.slice(pluralAt, SOURCE.indexOf('\n  }', pluralAt));
+    assert.match(plural, /removeDiscardStateStylesheet\(sessionId\);/, 'the stylesheet comes down once');
+    assert.match(
+      plural,
+      /for \(const wrapper of set\) releaseDiscardedStaticWrapper\(wrapper\);/,
+      'every wrapper in the set is released',
+    );
+
+    // Intent of main's original guard, kept: discard must not blank the
+    // original, and must not animate stale chrome while waiting for HMR.
+    assert.match(
+      cleanup,
+      /if \(restoreOriginal\) showOriginalDuringDiscard\(cleanupSessionId\);/,
+      'only non-discard cleanup may blank the wrapper while waiting for HMR',
+    );
+  });
+
+  it('never leaves a shader behind when the teardown races its construction (#719)', () => {
+    // showShaderOverlay appends its canvas, then awaits createImageBitmap and
+    // the GL setup before it publishes shaderState. A teardown inside that
+    // window found shaderState null, returned, and then watched the
+    // construction publish itself over a session that had already reached
+    // CYCLING, with no teardown left to run. On a slow runner that is the
+    // generating loader frozen over a page that already cycles.
+    const hideStart = SOURCE.indexOf('function hideShaderOverlay()');
+    const hide = SOURCE.slice(hideStart, SOURCE.indexOf('\n  function ', hideStart + 10));
+    assert.match(
+      hide,
+      /shaderEpoch \+= 1;[\s\S]{0,120}?if \(!shaderState\) \{/,
+      'the epoch must be bumped before the no-state early return, or an in-flight construction never hears about the teardown',
+    );
+    assert.match(hide, /removeStrayShaderNode\(\);/, 'a teardown must also drop a shader node no state owns');
+
+    const showStart = SOURCE.indexOf('async function showShaderOverlay(');
+    const show = SOURCE.slice(showStart, SOURCE.indexOf('\n  async function handleAccept', showStart));
+    assert.match(show, /const epoch = shaderEpoch;/, 'the construction must pin the epoch it owns');
+    assert.match(
+      show,
+      /const abandoned = \(node, gl\) => \{[\s\S]{0,80}?if \(epoch === shaderEpoch\) return false;[\s\S]{0,200}?return true;/,
+      'abandoning must remove the canvas and release the GL context',
+    );
+    assert.match(
+      show,
+      /if \(abandoned\(canvas, gl\)\) return;\n    shaderState = \{ canvas, gl, program, texture,/,
+      'the publish must be guarded by the epoch it pinned',
+    );
+    const awaitIdx = show.indexOf('await createImageBitmap(blob)');
+    assert.ok(awaitIdx > 0, 'createImageBitmap is the await this guards');
+    assert.ok(
+      show.indexOf('if (abandoned(canvas, gl))', awaitIdx) > awaitIdx,
+      'the bitmap await must be followed by an abandonment check',
+    );
+    for (const call of ['showShaderBitmapFallback(canvas, blob);']) {
+      let at = show.indexOf(call);
+      assert.ok(at > 0, call);
+      while (at > 0) {
+        const before = show.slice(Math.max(0, at - 220), at);
+        assert.match(before, /abandoned\(canvas, (?:gl|null)\)/, 'every fallback publish must be epoch guarded');
+        at = show.indexOf(call, at + 1);
+      }
+    }
+  });
+
+  it('lowers the shader on every route that sets CYCLING (#719)', () => {
+    // resumeSession reaches CYCLING through setLiveState(resumedState), which
+    // its own block covers; every literal site has to lower the loader too.
+    const sites = [...SOURCE.matchAll(/setLiveState\('CYCLING'\);/g)].map((m) => m.index);
+    assert.ok(sites.length >= 8, `expected the known CYCLING sites, saw ${sites.length}`);
+    for (const at of sites) {
+      const after = SOURCE.slice(at, at + 260);
+      assert.match(
+        after,
+        /hideShaderOverlay\(\);/,
+        `a setLiveState('CYCLING') at offset ${at} does not lower the generating shader`,
+      );
+    }
+  });
+
+  it('prefers the wrapper that actually holds variants over the first match (#719)', () => {
+    // A target inside a `.map()` renders one wrapper per item, and an agent
+    // that relocates the wrapper out of the shared primitive live-wrap
+    // scaffolded leaves an empty one behind. First match can then pin a
+    // scaffold with no variants and strand the session at 0/N.
+    const start = SOURCE.indexOf('function pickPopulatedVariantsWrapper(selector)');
+    assert.ok(start > 0, 'pickPopulatedVariantsWrapper must exist');
+    const helper = SOURCE.slice(start, SOURCE.indexOf('\n  function startVariantObserver(', start));
+    assert.match(helper, /if \(matches\.length < 2\) return matches\[0\] \|\| null;/);
+    assert.match(
+      helper,
+      /candidate\.querySelector\('\[data-impeccable-variant\]:not\(\[data-impeccable-variant="original"\]\)'\)[\s\S]{0,80}?return candidate;/,
+      'the preferred wrapper is the one holding non-original variants',
+    );
+    assert.match(helper, /return matches\[0\];/, 'with no populated wrapper the old first match still wins');
+    assert.match(
+      helper,
+      /function findVariantsWrapper\(sessionId\) \{\n    if \(!sessionId\) return null;/,
+      'a missing id must not silently widen the lookup to any session',
+    );
+    assert.match(
+      helper,
+      /function findAnyVariantsWrapper\(\) \{[\s\S]{0,120}?'\[data-impeccable-variants\]'/,
+      'the resume paths that have no id yet need their own entry point',
+    );
+  });
+
+  it('routes every active-session wrapper lookup through the resolver (#719)', () => {
+    // Bugbot on #720: findVariantsWrapper alone is not enough while the bar
+    // anchor, the visible-variant element, the params count, and accept still
+    // take the first match, because in the relocated-wrapper case Tune never
+    // binds and the bar keeps anchoring to the empty scaffold.
+    for (const fn of [
+      'function resolveBarAnchor()',
+      'function isInsertGeneratingSession()',
+      'function ensureInsertPlaceholder()',
+      'function mountedParameterCount()',
+      'function readVisibleVariantFromDOM(sessionId)',
+      'function snapshotAcceptedVariantDom(sessionId, variantId)',
+      'function commitAcceptedVariantToDom(sessionId, variantId)',
+    ]) {
+      const at = SOURCE.indexOf(fn);
+      assert.ok(at > 0, `${fn} should exist`);
+      const body = SOURCE.slice(at, SOURCE.indexOf('\n  }', at));
+      assert.doesNotMatch(
+        body,
+        /document\.querySelector\('\[data-impeccable-variants="'/,
+        `${fn} must resolve the session wrapper through findVariantsWrapper`,
+      );
+    }
+
+    // Anything still taking a raw first match is a deliberate existence check
+    // or a cleanup sweep. Pinning the exact set means a new raw lookup has to
+    // justify itself here rather than quietly reintroducing the bug.
+    const rawSites = [...SOURCE.matchAll(
+      /(?:const (\w+) = (?:!!)?|(if) \()[^\n]{0,40}?document\.querySelector\('\[data-impeccable-variants="' \+ [\w.?]+ \+ '"\]'\)/g,
+    )].map((m) => m[1] || m[2]);
+    assert.deepEqual(
+      [...rawSites].sort(),
+      [
+        // existence only, inside the variant-anchor retry observer
+        'wrapperLanded',
+        // svelte component republish: an identity check next to
+        // svelteComponentSession, and a component wrapper holds no variants
+        'existingWrapper',
+        // orphan removal in abortSvelteComponentInjection
+        'orphan',
+        // orphan removal in resetSvelteComponentSession
+        'orphan',
+        // pendingAcceptedSession existence guard
+        'if',
+      ].sort(),
+      'a new raw [data-impeccable-variants=...] first-match lookup appeared; route it through findVariantsWrapper, or add it here with the reason it may take the first match',
+    );
+    assert.equal(
+      rawSites.length,
+      SOURCE.split(`document.querySelector('[data-impeccable-variants="'`).length - 1,
+      'every raw session-wrapper lookup must be shaped so this guard can see it',
     );
   });
 
