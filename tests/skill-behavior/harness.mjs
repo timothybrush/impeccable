@@ -86,7 +86,12 @@ function loadSkillBody() {
   return md.trim();
 }
 
-export const SKILL_BODY = loadSkillBody();
+// This provider-neutral fixture assumes a loaded skill with a known base
+// directory, not an exact copy of each host's transformed prompt. Claude's
+// loader supplies a base-directory prefix; here it is workspace-relative
+// because the file tools reject absolute paths. Provider rewrite/loader
+// contracts are tested separately, not established by these behavior cases.
+export const SKILL_BODY = `Base directory for this skill (workspace-relative): .claude/skills/impeccable\n\n${loadSkillBody()}`;
 
 /**
  * Create a temp workspace and prepopulate it.
@@ -404,6 +409,10 @@ export async function runTurn({ workspace, model, userPrompt, priorMessages = []
       // Real client-side deadline on the provider call: without it a stalled
       // stream wedges the whole sweep with no tally.
       abortSignal: controller.signal,
+      // The Anthropic-compatible adapter does not recognize DeepSeek and
+      // otherwise caps each response at 4096 tokens, truncating valid tool
+      // continuations. Keep an explicit ceiling; length remains a test failure.
+      maxOutputTokens: model?.modelId?.startsWith('deepseek-') ? 16_384 : undefined,
       // Resolved from the model object so the 21 runTurn call sites stay
       // unchanged. Reasoning models run at the provider default otherwise,
       // which is not the tier this suite is meant to measure.
