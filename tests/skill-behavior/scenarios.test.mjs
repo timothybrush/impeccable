@@ -28,7 +28,7 @@ import {
   ENGINE_MISSING_MESSAGE,
 } from './harness.mjs';
 import { detectProvider, getModel, hasKey, resolveModelList, PROVIDERS } from './providers.mjs';
-import { assertPlanningFallbackWarning, LAUNCHER_FAILURE_WARNING, assertAdviceOnly, assertWorkflowAdvice, assertCommandComparison, missingReferences } from './assertions.mjs';
+import { assertLauncherDenialWarningBeforeNextTool, assertPlanningFallbackWarning, LAUNCHER_FAILURE_WARNING, assertAdviceOnly, assertWorkflowAdvice, assertCommandComparison, missingReferences } from './assertions.mjs';
 import { assertCompleted } from '../skill-workflow/assertions.mjs';
 import {
   PRODUCT_MD_SAMPLE,
@@ -707,6 +707,35 @@ for (const modelId of resolveModelList()) {
         }
       });
     }
+
+    it('scenario 19: denied launcher requires document.md before writing DESIGN.md', async () => {
+      const workspace = prepareWorkspace({ files: {
+        'PRODUCT.md': PRODUCT_MD_SAMPLE,
+        'index.html': MINIMAL_LANDING_HTML,
+      } });
+      try {
+        const { trace, stepTexts, finishReason, responseMessages } = await runTurn({
+          workspace,
+          model,
+          userPrompt: '/impeccable document. Record the incumbent design system from index.html into DESIGN.md.',
+          maxSteps: 14,
+          denyBash: true,
+        });
+        logTrace('S19', 'denied-launcher-document', modelId, trace, { finishReason, text: stepTexts.join('\n') });
+        assert.notEqual(finishReason, 'length', 'a truncated response is not a completed documentation pass');
+        assert.ok(trace.toolCalls.some((call) => call.name === 'bash' && call.denied && /impeccable\s+context\b/.test(call.input.command)), 'must encounter an actual denied context attempt');
+        const designWriteIndex = trace.toolCalls.findIndex((call) => call.mutatedPaths.some((p) => /(?:^|\/)DESIGN\.md$/.test(p)));
+        assert.ok(designWriteIndex >= 0, 'must still produce DESIGN.md, not stop at the refusal');
+        const documentReadIndex = trace.toolCalls.findIndex((call) => call.name === 'read' && call.succeeded && /(?:^|\/)reference\/document\.md$/.test(call.input.path));
+        assert.ok(documentReadIndex >= 0 && documentReadIndex < designWriteIndex, 'reference/document.md must actually be read before DESIGN.md is written');
+        const sourceReadIndex = trace.toolCalls.findIndex((call) => call.name === 'read' && call.succeeded && call.input.path.endsWith('index.html'));
+        assert.ok(sourceReadIndex >= 0 && sourceReadIndex < designWriteIndex, 'the incumbent source must be read before DESIGN.md is written');
+        assertLauncherDenialWarningBeforeNextTool(responseMessages);
+        assert.ok(!trace.toolCalls.some((call) => call.mutatedPaths.some((p) => /(?:^|\/)PRODUCT\.md$/.test(p))), 'must not rewrite PRODUCT.md');
+      } finally {
+        cleanupWorkspace(workspace);
+      }
+    });
 
     it('scenario 19: denied launcher keeps planning-only work read-only without craft-floor', async () => {
       const workspace = prepareWorkspace({ files: {
