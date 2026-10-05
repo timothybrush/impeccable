@@ -44,7 +44,7 @@ fn status_next_step_tracks_the_recorded_finish_and_later_entry_edits() {
     assert!(!finished.contains("Spawn"));
     ws.write("index.html", b"<main>Changed after finish</main>");
     let changed = next_instruction(&io, &state);
-    assert!(changed.contains("entry changed after finish"), "{changed}");
+    assert!(changed.contains("changed after finish (index.html)"), "{changed}");
     assert!(changed.contains("build-phase finish"));
     // Reporting status does not reopen phases or silently sign the new bytes.
     assert_eq!(state["phases"]["review"]["status"], "closed");
@@ -1158,9 +1158,13 @@ fn text_only_hero(restyled: bool) -> Image {
 }
 
 fn run_text_only_hero(capture: &Image, approved: Option<&Image>) -> (Gate, Value) {
+    run_text_only_hero_on(&text_only_hero(false), capture, approved)
+}
+
+fn run_text_only_hero_on(comp: &Image, capture: &Image, approved: Option<&Image>) -> (Gate, Value) {
     let ws = Workspace::new();
     let png = |i: &Image| png_io::encode_png(i, &[]).unwrap();
-    ws.write("comp.png", &png(&text_only_hero(false)));
+    ws.write("comp.png", &png(comp));
     ws.write("index.html", b"<main><h1>Revenue</h1><button>Export</button></main>");
     let spec = json!({"comp":"comp.png","compSize":{"width":240,"height":160},"regions":[
         {"id":"headline","kind":"text","medium":"semantic","note":"striped headline lettering","type":{},
@@ -1459,4 +1463,235 @@ fn responsive_next_names_the_frame_the_gate_actually_diffs() {
     assert!(native.contains("a 1440x960 desktop first viewport") && !native.contains("desktop.png"), "{native}");
     let saved = next_instruction(&io, &json!({"phase":"responsive","breakpoint":"1536x1024"}));
     assert!(saved.contains("the first viewport of desktop.png (its top 1440x960"), "{saved}");
+}
+
+/// A native renderer that binds the files it read, like the real one: its
+/// evidence report carries the `inputs.json` manifest of the current bytes.
+/// `changed_during` stands in for an edit landing while the capture ran.
+struct ManifestRenderer { desktop: Vec<u8>, changed_during: Option<&'static str> }
+struct ManifestCapture(crate::entry_capture::EntryEvidence, crate::entry_capture::ApprovedReference, Option<&'static str>);
+impl CapturedEntry for ManifestCapture {
+    fn approved_reference(&self) -> Option<&crate::entry_capture::ApprovedReference> { Some(&self.1) }
+    fn evidence(&self) -> &crate::entry_capture::EntryEvidence { &self.0 }
+    fn verify_current(&self) -> Result<(), String> {
+        self.2.map_or(Ok(()), |file| Err(format!("capture input changed: {file}")))
+    }
+}
+impl EntryRenderer for ManifestRenderer {
+    fn capture_entry(&self, request: &EntryRequest) -> Result<Box<dyn CapturedEntry>, String> {
+        let files: Vec<Value> = ["index.html", "fonts/face.ttf"].iter().map(|path| {
+            let bytes = std::fs::read(request.root.join(path)).unwrap();
+            json!({"path": path, "sha256": sha256_bytes(&bytes), "bytes": bytes.len(), "served": true})
+        }).collect();
+        let report = json!({"schema":"native-entry-capture-v1","inputSnapshot":"test",
+            "manifest":{"schema":"native-html-input-snapshot-v1","entry":"index.html","files":files}});
+        let frame = |name: &str| crate::entry_capture::FrameEvidence { name: name.into(), png: self.desktop.clone(), regions: vec![] };
+        Ok(Box::new(ManifestCapture(crate::entry_capture::EntryEvidence { report, frames: vec![frame("desktop"), frame("mobile")] },
+            crate::entry_capture::ApprovedReference { png: self.desktop.clone(), proof: json!({"schema": "test-review"}) }, self.changed_during)))
+    }
+}
+
+/// A comp-led native build with every phase closed and the review open, the
+/// page accepted at the first viewport so the final recheck passes on fidelity.
+fn finished_native_workspace() -> (Workspace, Vec<u8>) {
+    let ws = reviewed_desktop_workspace();
+    ws.write("fonts/face.ttf", b"font v1");
+    let mut state = json!({"phase":"review", "capturePolicy":"native-html-v1", "artifact":"index.html",
+        "comp":"comp.png", "sessionId":"owner", "startedAt":"build-one", "phases":{}});
+    for phase in PHASES { state["phases"][phase] = json!({"status":"closed", "attempts":1, "gate":{"ok":true}}); }
+    state["phases"]["review"]["status"] = json!("open");
+    save_state(&ws.io(), &state);
+    let desktop = png_io::encode_png(&reviewed_hero(true, false), &[]).unwrap();
+    (ws, desktop)
+}
+
+#[test]
+fn native_ship_binds_every_captured_input_and_a_later_edit_voids_it_until_recaptured() {
+    let (ws, desktop) = finished_native_workspace();
+    let renderer = ManifestRenderer { desktop, changed_during: None };
+    let mut io = ws.io();
+    let ship = ["finish", "--disposition", "ship"].map(String::from);
+    assert_eq!(run_with_renderer(&ship, &mut io, &no_organic_scan, Some(&renderer)), 0);
+    let state = load_state(&io).unwrap();
+    let inputs = state["finish"]["captureInputs"].as_array().unwrap();
+    assert_eq!(inputs.iter().map(|f| f["path"].as_str().unwrap()).collect::<Vec<_>>(), ["index.html", "fonts/face.ttf"]);
+    let report = crate::completion::report(&ws.path, Some(&state), Some("owner"));
+    assert_eq!(report["status"], "complete");
+    let next = next_instruction(&io, &state);
+    assert!(next.starts_with("Finish is recorded for the current entry.") && next.contains("a fix for a hook finding included, voids it")
+        && next.contains("build-phase finish --disposition ship again") && next.contains("re-captures the current files natively"), "{next}");
+
+    // A font the page loads changes after ship: the entry bytes are the same,
+    // but the shipped page is not the one the final capture saw.
+    ws.write("fonts/face.ttf", b"font v2");
+    let report = crate::completion::report(&ws.path, Some(&state), Some("owner"));
+    assert_eq!(report["status"], "changed-after-finish");
+    assert_eq!(report["changedSinceFinish"], json!(["fonts/face.ttf"]));
+    assert_eq!(report["canContinue"], true);
+    let next = next_instruction(&io, &state);
+    assert!(next.contains("A file the final check bound changed after finish (fonts/face.ttf)") && next.contains("build-phase finish --disposition ship again"), "{next}");
+    ws.write("index.html", b"<main><h1>Headline, fixed after ship</h1></main>");
+    let report = crate::completion::report(&ws.path, Some(&state), Some("owner"));
+    assert_eq!(report["changedSinceFinish"], json!(["index.html", "fonts/face.ttf"]));
+    // A deleted entry is a change the manifest names, not an unverifiable finish.
+    std::fs::remove_file(ws.path.join("index.html")).unwrap();
+    let report = crate::completion::report(&ws.path, Some(&state), Some("owner"));
+    assert_eq!(report["status"], "changed-after-finish");
+    assert_eq!(report["changedSinceFinish"], json!(["index.html", "fonts/face.ttf"]));
+    ws.write("index.html", b"<main><h1>Headline, fixed after ship</h1></main>");
+
+    // Recording ship again re-captures the current files and binds them.
+    assert_eq!(run_with_renderer(&ship, &mut io, &no_organic_scan, Some(&renderer)), 0);
+    let state = load_state(&io).unwrap();
+    assert_eq!(crate::completion::report(&ws.path, Some(&state), Some("owner"))["status"], "complete");
+    assert_eq!(state["phases"]["responsive"]["attempts"], 3);
+}
+
+#[test]
+fn native_ship_is_refused_when_an_input_changes_while_the_final_capture_runs() {
+    let (ws, desktop) = finished_native_workspace();
+    let renderer = ManifestRenderer { desktop, changed_during: Some("index.html") };
+    let mut io = ws.io();
+    let ship = ["finish", "--disposition", "ship"].map(String::from);
+    assert_eq!(run_with_renderer(&ship, &mut io, &no_organic_scan, Some(&renderer)), 2);
+    let state = load_state(&io).unwrap();
+    assert_eq!(state["finish"]["disposition"], "fix");
+    assert!(state["finish"]["captureInputs"].is_null());
+    assert_eq!(state["phase"], "responsive");
+    assert_eq!(state["phases"]["responsive"]["status"], "open");
+    let reasons = state["phases"]["responsive"]["gate"]["reasons"].as_array().unwrap();
+    assert!(reasons.iter().any(|r| r.as_str().unwrap().contains("capture input changed: index.html")), "{reasons:?}");
+}
+
+/// A native renderer whose capture leaves no input manifest.
+struct BareRenderer(Vec<u8>);
+impl EntryRenderer for BareRenderer {
+    fn capture_entry(&self, _: &EntryRequest) -> Result<Box<dyn CapturedEntry>, String> {
+        let frame = |name: &str| crate::entry_capture::FrameEvidence { name: name.into(), png: self.0.clone(), regions: vec![] };
+        Ok(Box::new(ManifestCapture(crate::entry_capture::EntryEvidence { report: json!({}), frames: vec![frame("desktop"), frame("mobile")] },
+            crate::entry_capture::ApprovedReference { png: self.0.clone(), proof: json!({"schema": "test-review"}) }, None)))
+    }
+}
+
+#[test]
+fn native_ship_is_refused_when_the_final_capture_leaves_no_manifest() {
+    let (ws, desktop) = finished_native_workspace();
+    let mut io = ws.io();
+    let ship = ["finish", "--disposition", "ship"].map(String::from);
+    assert_eq!(run_with_renderer(&ship, &mut io, &no_organic_scan, Some(&BareRenderer(desktop))), 2);
+    let state = load_state(&io).unwrap();
+    assert_eq!(state["finish"]["disposition"], "fix");
+    assert!(state["finish"]["captureInputs"].is_null());
+    assert_ne!(crate::completion::report(&ws.path, Some(&state), Some("owner"))["status"], "complete");
+}
+
+#[test]
+fn screenshot_policy_finish_binds_no_capture_manifest() {
+    let ws = Workspace::new();
+    ws.write("index.html", b"<main>Finished</main>");
+    ws.write(".impeccable/review/native/responsive/inputs.json", br#"{"manifest":{"files":[{"path":"index.html","sha256":"stale"}]}}"#);
+    let mut io = ws.io();
+    let mut state = json!({"phase":"review", "artifact":"index.html", "phases":{}});
+    for phase in PHASES { state["phases"][phase] = json!({"status":"closed"}); }
+    state["responsiveInputSha256"] = json!(crate::completion::input_hash(&ws.path));
+    save_state(&io, &state);
+    assert_eq!(run(&["finish", "--disposition", "ship"].map(String::from), &mut io, &no_organic_scan), 0);
+    let state = load_state(&io).unwrap();
+    assert!(state["finish"]["captureInputs"].is_null());
+    assert_eq!(crate::completion::report(&ws.path, Some(&state), None)["status"], "complete");
+    let next = next_instruction(&io, &state);
+    assert!(next.contains("recapture desktop and mobile and advance responsive first"), "{next}");
+}
+
+#[test]
+fn review_next_says_ship_rechecks_and_a_later_edit_needs_ship_again() {
+    let ws = Workspace::new();
+    let io = ws.io();
+    let native = next_instruction(&io, &json!({"phase":"review", "capturePolicy":"native-html-v1"}));
+    assert!(native.starts_with("Spawn the finish reviewer") && native.contains("Make every fix before ship: ship re-captures the current files natively")
+        && native.contains("needs ship recorded again"), "{native}");
+    let screenshots = next_instruction(&io, &json!({"phase":"review"}));
+    assert!(screenshots.contains("ship refuses while the frontend files differ from the responsive screenshots"), "{screenshots}");
+}
+
+/// The code-led first viewport with a lettered export control (`export`), or
+/// with that control left out of the page.
+fn lettered_text_only_hero(restyled: bool, export: bool) -> Image {
+    let mut img = text_only_hero(restyled);
+    if export {
+        for x in (166..218).step_by(4) { r::fill_rect(&mut img, x as f64, 121., 2., 14., [240., 240., 240., 255.]); }
+    } else {
+        r::fill_rect(&mut img, 160., 116., 64., 24., [244., 244., 240., 255.]);
+    }
+    img
+}
+
+fn text_only_hero_without_export() -> Image { lettered_text_only_hero(true, false) }
+
+#[test]
+fn a_code_region_the_accepted_first_viewport_lacks_does_not_block_the_hero() {
+    let comp = lettered_text_only_hero(false, true);
+    let current = text_only_hero_without_export();
+    let missing = |g: &Gate| g.reasons.iter().any(|r| r.contains("region export is missing"));
+    // Unreviewed, the comp's control is missing and blocks.
+    let (unreviewed, _) = run_text_only_hero_on(&comp, &current, None);
+    assert!(missing(&unreviewed), "{:?}", unreviewed.reasons);
+    // The user saw this first viewport without the control and accepted it: the phase closes.
+    let (accepted, report) = run_text_only_hero_on(&comp, &current, Some(&current));
+    assert!(accepted.ok, "{:?}", accepted.reasons);
+    assert!(accepted.advisories.iter().any(|a| a.starts_with("(advisory, accepted in the first-viewport review) region export is missing") && a.contains("the first viewport the user accepted lacks it too")), "{:?}", accepted.advisories);
+    assert!(report["humanHeroReview"]["acceptedRegions"].as_array().unwrap().contains(&json!("export")), "{report}");
+}
+
+#[test]
+fn a_code_region_removed_after_the_acceptance_still_blocks_the_hero() {
+    // The user accepted the viewport with the control; the build dropped it afterwards.
+    let (gate, report) = run_text_only_hero_on(&lettered_text_only_hero(false, true), &text_only_hero_without_export(), Some(&lettered_text_only_hero(true, true)));
+    assert!(!gate.ok);
+    assert!(gate.reasons.iter().any(|r| r.starts_with("region export is missing") && !r.contains("accepted")), "{:?}", gate.reasons);
+    assert!(gate.reasons[0].starts_with("the hero capture no longer matches the first viewport the user accepted") && gate.reasons[0].contains("export"), "{:?}", gate.reasons);
+    assert!(!gate.advisories.iter().any(|a| a.contains("region export is missing")), "{:?}", gate.advisories);
+    assert_eq!(report["humanHeroReview"]["viewportAccepted"], false);
+}
+
+#[test]
+fn a_plate_the_accepted_first_viewport_lacks_asks_the_user_instead_of_looping() {
+    let blank = reviewed_hero(true, false);
+    let (gate, _) = run_reviewed_hero(&blank, Some(&blank), REVIEWED_PAGE);
+    assert!(!gate.ok);
+    let reason = gate.reasons.iter().find(|r| r.starts_with("region art is missing")).expect("the plate still blocks");
+    assert!(reason.contains("already lacks it, so restoring what they accepted cannot clear this") && reason.contains("ask the user") && reason.contains("build-phase advance --force --reason"), "{reason}");
+    let example = reason.split("for example: ").nth(1).unwrap().split(')').next().unwrap();
+    assert!(force_allowed(Some(example)), "{example}");
+    // With another material veto outstanding, force would close that too: the question waits.
+    let svg = format!("{REVIEWED_PAGE}<svg width=\"400\" height=\"300\" viewBox=\"0 0 400 300\">{}</svg>",
+        (0..12).map(|i| format!("<path d=\"M{i} 0 C {} 40 80 {} 120 {i} S 200 90 240 {}\"/>", i * 7, i * 9, i * 11)).collect::<String>());
+    let (gate, _) = run_reviewed_hero(&blank, Some(&blank), &svg);
+    assert!(gate.reasons.iter().any(|r| r.contains("inline SVG")), "{:?}", gate.reasons);
+    let reason = gate.reasons.iter().find(|r| r.starts_with("region art is missing")).expect("the plate still blocks");
+    assert!(reason.contains("Clear the other blocking reasons first") && !reason.contains("--force --reason"), "{reason}");
+    // Unreviewed, or removed after the acceptance, the plate blocks without the question.
+    for approved in [None, Some(reviewed_hero(true, true))] {
+        let (gate, _) = run_reviewed_hero(&blank, approved.as_ref(), REVIEWED_PAGE);
+        let reason = gate.reasons.iter().find(|r| r.starts_with("region art is missing")).expect("the plate still blocks");
+        assert!(!reason.contains("ask the user"), "{reason}");
+    }
+}
+
+#[test]
+fn a_code_region_the_accepted_first_viewport_lacks_carries_to_desktop_width() {
+    let ws = reviewed_desktop_workspace();
+    // The comp has the control; the accepted first viewport and the desktop frame do not.
+    let current = reviewed_hero(false, false);
+    let mut without = current.clone();
+    r::fill_rect(&mut without, 120., 84., 60., 24., [230., 220., 200., 255.]);
+    let (unreviewed, _) = run_reviewed_desktop(&ws, &without, None, 0.1);
+    assert!(unreviewed.reasons.iter().any(|r| r.contains("region headline is missing")), "{:?}", unreviewed.reasons);
+    let (accepted, report) = run_reviewed_desktop(&ws, &without, Some(&without), 0.1);
+    assert!(accepted.ok, "{:?}", accepted.reasons);
+    assert!(accepted.advisories.iter().any(|a| a.starts_with("(advisory, accepted in the first-viewport review) at desktop width, region headline is missing")), "{:?}", accepted.advisories);
+    assert_eq!(report["humanTextReview"]["acceptedRegions"], json!(["headline"]));
+    // Removed after the acceptance: it blocks again.
+    let (removed, _) = run_reviewed_desktop(&ws, &without, Some(&current), 0.1);
+    assert!(removed.reasons.iter().any(|r| r == "at desktop width, region headline is missing"), "{:?}", removed.reasons);
 }
