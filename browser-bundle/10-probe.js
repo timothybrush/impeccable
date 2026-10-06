@@ -53,6 +53,27 @@ function __rectArray(r) {
 // rects belong to the same line. Nothing is merged here — the rects travel as
 // the page gave them and the consumer groups them into lines (see
 // merge_text_rects_into_lines in crates/foundation/src/browser/dom.rs).
+// A descendant whose text is on no line, the same test as renders_no_text in
+// crates/foundation/src/browser/dom.rs: the deep walk skips it so the line
+// rects and the characters line-length divides among them describe the same
+// text. Chrome reports no rects inside a content-visibility: hidden box
+// today; the walk skips it by the shared rule rather than relying on that.
+// content-visibility applies only where layout containment does, so these
+// displays render their text whatever it says (content_visibility_applies).
+const __NO_TEXT_TAGS = new Set(['style', 'script', 'noscript', 'template']);
+const __NO_CONTAINMENT_DISPLAYS = new Set([
+  'inline', 'inline flow', 'contents', 'table-row', 'table-row-group',
+  'table-header-group', 'table-footer-group', 'table-column',
+  'table-column-group', 'ruby', 'ruby-base', 'ruby-text',
+  'ruby-base-container', 'ruby-text-container',
+]);
+function __rendersNoText(el) {
+  if (__NO_TEXT_TAGS.has(String(el.localName || '').toLowerCase())) return true;
+  const cs = getComputedStyle(el);
+  if (cs.display === 'none') return true;
+  return String(cs.contentVisibility || '').toLowerCase() === 'hidden'
+    && !__NO_CONTAINMENT_DISPLAYS.has(String(cs.display || '').toLowerCase().trim());
+}
 function __collectTextRects(node, deep, out) {
   for (const child of node.childNodes) {
     if (child.nodeType === 3) {
@@ -63,7 +84,7 @@ function __collectTextRects(node, deep, out) {
         if (rect.width >= 1 && rect.height >= 1) out.push(rect);
       }
       range.detach?.();
-    } else if (deep && child.nodeType === 1) {
+    } else if (deep && child.nodeType === 1 && !__rendersNoText(child)) {
       __collectTextRects(child, true, out);
     }
   }
@@ -177,6 +198,17 @@ const __impeccableDom = {
     }
     return out;
   },
+  // The element children and text nodes of el.childNodes in order: an
+  // element's handle, or 0 for a text node (its data is the matching entry of
+  // direct_text_nodes, which walks the same list).
+  child_node_kinds(el) {
+    const out = [];
+    for (const n of __el(el).childNodes) {
+      if (n.nodeType === 3) out.push(0);
+      else if (n.nodeType === 1) out.push(__intern(n));
+    }
+    return out;
+  },
   is_content_editable(el) { return !!__el(el).isContentEditable; },
   hidden_prop(el) { return !!__el(el).hidden; },
   style(el, prop) {
@@ -200,6 +232,7 @@ const __impeccableDom = {
   client_left(el) { return __el(el).clientLeft; },
   scroll_width(el) { return __el(el).scrollWidth; },
   scroll_left(el) { return __el(el).scrollLeft; },
+  scroll_height(el) { return __el(el).scrollHeight; },
   offset_width(el) { return __el(el).offsetWidth; },
   offset_height(el) { return __el(el).offsetHeight; },
   check_visibility(el) {
@@ -217,6 +250,42 @@ const __impeccableDom = {
     const right = Math.max(...rects.map(r => r.right));
     const bottom = Math.max(...rects.map(r => r.bottom));
     return [left, top, right - left, bottom - top, top, right, bottom, left];
+  },
+  // JSON `["opacity", ...]`: the properties, hyphenated, of every animation
+  // and transition running on the element itself (running or pending, not a
+  // pseudo-element's). The snapshot records the same (15-snapshot.js
+  // __snapRunningAnimations). undefined when the Web Animations API is
+  // missing or throws.
+  running_animation_properties(el) {
+    const node = __el(el);
+    if (typeof node.getAnimations !== 'function') return undefined;
+    let animations;
+    try { animations = node.getAnimations(); } catch { return undefined; }
+    const metadata = new Set(['offset', 'computedOffset', 'easing', 'composite']);
+    const props = [];
+    const add = (property) => {
+      const name = String(property).startsWith('--')
+        ? String(property)
+        : String(property).replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+      if (name && !props.includes(name)) props.push(name);
+    };
+    for (const animation of animations) {
+      let effect;
+      try {
+        if (animation.playState !== 'running' && !animation.pending) continue;
+        effect = animation.effect;
+      } catch { continue; }
+      if (!effect || effect.pseudoElement || effect.target !== node) continue;
+      if (typeof animation.transitionProperty === 'string') add(animation.transitionProperty);
+      let frames = [];
+      try { frames = effect.getKeyframes?.() || []; } catch { frames = []; }
+      for (const frame of frames) {
+        for (const property of Object.keys(frame)) {
+          if (!metadata.has(property)) add(property);
+        }
+      }
+    }
+    return JSON.stringify(props);
   },
   // Every rect of the element's rendered text, descendants included, flattened
   // into eights. The scope is the element's whole text_content, which is the

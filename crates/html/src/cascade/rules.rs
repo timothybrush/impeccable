@@ -247,6 +247,50 @@ impl<K: Hash + Eq> SpecifiedStore<K> {
 /// Layout properties the stripe-child static adapter needs that are not in
 /// the frozen `expandStaticDeclaration` allowlist. Applied here so the
 /// recorded vectors stay byte-equal.
+/// The alignment values in a `place-*` shorthand, one per axis. An overflow
+/// keyword (`safe`, `unsafe`) belongs to the position after it and a
+/// `first`/`last` to the `baseline` after it, so `safe center` is one value
+/// and, alone, sets both axes.
+fn place_alignment_components(tokens: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut pending: Option<String> = None;
+    for token in tokens {
+        let lower = js::to_lower_case(&token);
+        if matches!(lower.as_str(), "safe" | "unsafe" | "first" | "last") {
+            pending = Some(match pending.take() {
+                Some(p) => format!("{p} {token}"),
+                None => token,
+            });
+            continue;
+        }
+        out.push(match pending.take() {
+            Some(p) => format!("{p} {token}"),
+            None => token,
+        });
+    }
+    if let Some(p) = pending {
+        out.push(p);
+    }
+    out
+}
+
+#[cfg(test)]
+mod place_alignment_tests {
+    use super::*;
+
+    fn comps(v: &str) -> Vec<String> {
+        place_alignment_components(split_css_tokens(v))
+    }
+
+    #[test]
+    fn overflow_and_baseline_keywords_join_their_value() {
+        assert_eq!(comps("safe center"), vec!["safe center"]);
+        assert_eq!(comps("unsafe end safe start"), vec!["unsafe end", "safe start"]);
+        assert_eq!(comps("first baseline center"), vec!["first baseline", "center"]);
+        assert_eq!(comps("center start"), vec!["center", "start"]);
+    }
+}
+
 fn extra_specified_expansions(prop: &str, value: &str) -> Vec<Expanded> {
     let p = js::to_lower_case(prop);
     let v = js::trim(value);
@@ -257,6 +301,8 @@ fn extra_specified_expansions(prop: &str, value: &str) -> Vec<Expanded> {
         "flex-direction" => vec![("flexDirection".into(), v.to_string())],
         "align-items" => vec![("alignItems".into(), v.to_string())],
         "align-self" => vec![("alignSelf".into(), v.to_string())],
+        "justify-content" => vec![("justifyContent".into(), v.to_string())],
+        "justify-items" => vec![("justifyItems".into(), v.to_string())],
         // `var()` and CSS-wide keywords resolve later, per longhand; the
         // stripe adapter picks the keyword out of the resolved list.
         "flex-flow" | "place-items" | "place-self"
@@ -271,7 +317,12 @@ fn extra_specified_expansions(prop: &str, value: &str) -> Vec<Expanded> {
                 "place-items" => "alignItems",
                 _ => "alignSelf",
             };
-            vec![(longhand.into(), v.to_string())]
+            let mut out: Vec<Expanded> = vec![(longhand.into(), v.to_string())];
+            // `place-items` sets both axes; a single var() answers for both.
+            if p == "place-items" {
+                out.push(("justifyItems".into(), v.to_string()));
+            }
+            out
         }
         // Shorthands reset what they omit: `flex-flow: wrap` is a row.
         "flex-flow" => {
@@ -286,11 +337,24 @@ fn extra_specified_expansions(prop: &str, value: &str) -> Vec<Expanded> {
                 .unwrap_or_else(|| "row".to_string());
             vec![("flexDirection".into(), direction)]
         }
-        "place-items" => split_css_tokens(v)
-            .into_iter()
-            .next()
-            .map(|t| vec![("alignItems".into(), t)])
-            .unwrap_or_default(),
+        // `place-items: <align> [<justify>]`, one value setting both.
+        "place-items" => {
+            let tokens = place_alignment_components(split_css_tokens(v));
+            match tokens.first() {
+                Some(align) => {
+                    let justify = tokens.get(1).unwrap_or(align).clone();
+                    vec![("alignItems".into(), align.clone()), ("justifyItems".into(), justify)]
+                }
+                None => Vec::new(),
+            }
+        }
+        "place-content" => {
+            let tokens = split_css_tokens(v);
+            match tokens.get(1).or(tokens.first()) {
+                Some(justify) => vec![("justifyContent".into(), justify.clone())],
+                None => Vec::new(),
+            }
+        }
         "place-self" => split_css_tokens(v)
             .into_iter()
             .next()
@@ -319,6 +383,7 @@ pub fn apply_static_declaration<K: Hash + Eq>(
 ) {
     let map = specified.map.entry(node).or_default();
     let mut expanded = expand_static_declaration(prop, value);
+    expanded.extend(expand_border_radius_corners(prop, value));
     expanded.extend(internal_border_style_expansion(prop, value));
     expanded.extend(extra_specified_expansions(prop, value));
     for (expanded_prop, expanded_value) in expanded {
@@ -332,6 +397,44 @@ pub fn apply_static_declaration<K: Hash + Eq>(
             map.insert(expanded_prop, next);
         }
     }
+}
+
+/// The corner longhands a `border-radius` shorthand sets, entered into the
+/// specified store beside the shorthand itself (which the recorded
+/// `expandStaticDeclaration` still returns alone). Carrying the shorthand's
+/// cascade metadata onto each corner is what lets a later
+/// `border-top-right-radius: 0` win that corner and a later shorthand reset
+/// it. A value built from `var()` cannot be split before it resolves, so each
+/// corner carries the whole value, and `resolve_border_radius_corners` picks
+/// the corner's own position once the value has resolved.
+fn expand_border_radius_corners(prop: &str, value: &str) -> Vec<(String, String)> {
+    const CORNERS: [&str; 4] = [
+        "borderTopLeftRadius",
+        "borderTopRightRadius",
+        "borderBottomRightRadius",
+        "borderBottomLeftRadius",
+    ];
+    if js::to_lower_case(prop) != "border-radius" {
+        return Vec::new();
+    }
+    let v = js::trim(value);
+    if v.is_empty() {
+        return Vec::new();
+    }
+    let horizontal = v.split('/').next().unwrap_or("");
+    let tokens = super::values::split_css_tokens(horizontal);
+    if tokens.is_empty() || v.contains("var(") {
+        return CORNERS
+            .iter()
+            .map(|c| (c.to_string(), v.to_string()))
+            .collect();
+    }
+    let vals = super::shorthand::expand_static_box_values(&tokens);
+    CORNERS
+        .iter()
+        .zip(vals)
+        .map(|(c, val)| (c.to_string(), val))
+        .collect()
 }
 
 /// One declaration from a `style=""` attribute.
