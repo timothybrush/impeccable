@@ -771,6 +771,9 @@ const __impeccableSnapshot = {
           h: typeof el.height === 'number' ? el.height : 0,
           cur: el.currentSrc || '', src: typeof el.src === 'string' ? el.src : '',
         };
+        // `complete` separates an image whose fetch failed from one the
+        // browser has not requested yet; both have a naturalWidth of 0.
+        if (tag === 'IMG' && typeof el.complete === 'boolean') rec.md.cp = el.complete;
       }
       els[id - 1] = rec;
     }

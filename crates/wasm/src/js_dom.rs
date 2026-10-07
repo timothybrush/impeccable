@@ -63,6 +63,9 @@ extern "C" {
     fn offset_width(el: u32) -> f64;
     fn offset_height(el: u32) -> f64;
     fn check_visibility(el: u32) -> i32;
+    fn image_natural_size(el: u32) -> Vec<f64>;
+    fn image_complete(el: u32) -> i32;
+    fn image_current_src(el: u32) -> Option<String>;
     fn direct_text_rect(el: u32) -> Vec<f64>;
     fn running_animation_properties(el: u32) -> Option<String>;
     fn text_rects(el: u32) -> Vec<f64>;
@@ -382,6 +385,22 @@ impl Dom for JsDom {
             1 => Some(true),
             _ => None,
         }
+    }
+    fn image_natural_size(&self, el: ElId) -> Option<(f64, f64)> {
+        match image_natural_size(el)[..] {
+            [w, h] => Some((w, h)),
+            _ => None,
+        }
+    }
+    fn image_complete(&self, el: ElId) -> Option<bool> {
+        match image_complete(el) {
+            0 => Some(false),
+            1 => Some(true),
+            _ => None,
+        }
+    }
+    fn image_current_src(&self, el: ElId) -> Option<String> {
+        image_current_src(el)
     }
     fn direct_text_rect(&self, el: ElId) -> Option<Rect> {
         let v = direct_text_rect(el);
