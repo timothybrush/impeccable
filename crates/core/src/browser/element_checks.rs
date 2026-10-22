@@ -3169,6 +3169,53 @@ fn is_fade_strip_on_own_fill(dom: &dyn Dom, el: ElId, rect: &Rect, stops: &[Rgba
     !samples.is_empty() && on_fill * 2 >= samples.len()
 }
 
+/// A syntax highlighter's token (observations-1006 row 4, nitrostack.ai's
+/// `text-purple-400` keywords in a `whitespace-pre` sample): text in a
+/// monospace face whose spaces are kept (`pre`, `pre-wrap` or
+/// `break-spaces`; `pre-line` collapses them, as prose does), set inline
+/// beside at least one other inline run, or the parent's own text, in a
+/// different colour. The
+/// colours come from the language, not a palette. A one-colour terminal line
+/// on a neon hero is not a highlighted sample and is still read, and so is
+/// one whose other run paints nothing (hidden, transparent or at opacity 0).
+fn is_highlighted_code_token(dom: &dyn Dom, el: ElId) -> bool {
+    if !crate::checks::text_rules::is_monospace_family(&dom.style(el, "fontFamily")) {
+        return false;
+    }
+    if !matches!(dom.style(el, "whiteSpace").as_str(), "pre" | "pre-wrap" | "break-spaces") {
+        return false;
+    }
+    // Runs share a line: the token and the other run are inline boxes (a
+    // block paragraph beside it in another colour is not a highlighter).
+    let inline = |node: ElId| dom.style(node, "display").starts_with("inline");
+    if !inline(el) {
+        return false;
+    }
+    let Some(own) = parse_rgb_or_any(&dom.style(el, "color")) else { return false };
+    let Some(parent) = dom.parent(el) else { return false };
+    let differs = |node: ElId| {
+        parse_rgb_or_any(&dom.style(node, "color")).is_some_and(|c| {
+            (c.r - own.r).abs() + (c.g - own.g).abs() + (c.b - own.b).abs() > 24.0
+                || (c.alpha_or_one() - own.alpha_or_one()).abs() > 0.1
+        })
+    };
+    if !js::trim(&direct_text(dom, parent)).is_empty() && differs(parent) {
+        return true;
+    }
+    let paints = |node: ElId| {
+        !matches!(dom.style(node, "visibility").as_str(), "hidden" | "collapse")
+            && own_opacity(dom, node) > 0.0
+            && parse_rgb_or_any(&dom.style(node, "color")).is_some_and(|c| c.alpha_or_one() > 0.0)
+    };
+    dom.children(parent).into_iter().any(|sib| {
+        sib != el
+            && inline(sib)
+            && !js::trim(&dom.text_content(sib)).is_empty()
+            && paints(sib)
+            && differs(sib)
+    })
+}
+
 /// The neon-text half: a run of glyphs the element paints itself, in band,
 /// on a dark surface. SVG geometry, icon wrappers and spacer characters
 /// inherit `color` without painting text, and one glyph is a texture.
@@ -3185,6 +3232,9 @@ fn ai_palette_text_hit(
     // and still paints the whole word.
     let text = direct_text(dom, el);
     if utf16_len(js::trim(&text)) < AI_PALETTE_MIN_TEXT_CHARS {
+        return None;
+    }
+    if is_highlighted_code_token(dom, el) {
         return None;
     }
     let tc = parse_rgb_or_any(&dom.style(el, "color"))
@@ -4366,6 +4416,33 @@ fn generated_content_unmeasured(dom: &dyn Dom, el: ElId) -> bool {
     PSEUDOS.iter().any(|which| pseudo_unmeasured(dom, el, which))
 }
 
+/// Whether an absolutely positioned `::before` / `::after` generates one
+/// character drawn as a mark inside `el`: its box, placed from its containing
+/// block and moved by its transform ([`super::visual::pseudo_box`]), lies
+/// within `el`'s border box. hardyn.com.br strikes an out-of-stock size
+/// swatch with a rotated `content: "/"` at 50px, whose glyph raises the
+/// swatch's `scrollWidth` to 55px in a 35px box; the slash is a mark over the
+/// swatch, not a label running out of it. More than one character, a counter
+/// or an attribute, or a box the capture cannot place, stays unmeasured.
+fn is_placed_mark_inside(dom: &dyn Dom, el: ElId, which: &str, content: &str) -> bool {
+    let c = js::trim(content);
+    let quoted = c.len() >= 2
+        && ((c.starts_with('"') && c.ends_with('"')) || (c.starts_with('\'') && c.ends_with('\'')));
+    if !quoted || c[1..c.len() - 1].chars().count() != 1 {
+        return false;
+    }
+    let Some((placed, _)) = super::visual::pseudo_box(dom, el, which) else {
+        return false;
+    };
+    let host = dom.rect(el);
+    placed.all_finite()
+        && host.all_finite()
+        && placed.left >= host.left - 0.5
+        && placed.right <= host.right + 0.5
+        && placed.top >= host.top - 0.5
+        && placed.bottom <= host.bottom + 0.5
+}
+
 /// [`generated_content_unmeasured`] for one pseudo-element.
 fn pseudo_unmeasured(dom: &dyn Dom, el: ElId, which: &str) -> bool {
     if !pseudo_present(dom, el, which) {
@@ -4376,7 +4453,7 @@ fn pseudo_unmeasured(dom: &dyn Dom, el: ElId, which: &str) -> bool {
         return false;
     }
     if generated_content_has_text(&content) {
-        return true;
+        return !is_placed_mark_inside(dom, el, which, &content);
     }
     let position = pseudo_str(dom, el, which, "position");
     if position == "absolute" || position == "fixed" {
@@ -7611,6 +7688,53 @@ mod tests {
         assert!(check_element_ai_palette_dom(&d, label, Some(&empty)).ink.is_some());
     }
 
+    /// nitrostack.ai: syntax tokens in a highlighted sample are code, set in
+    /// a monospace face at `white-space: pre` beside runs in other colours. A
+    /// one-colour monospace line, a `pre-line` run and a line whose
+    /// whitespace collapses are still read (review of round 12).
+    #[test]
+    fn ai_palette_skips_highlighted_code_tokens() {
+        let (mut d, body) = page();
+        let panel = d.add(Some(body), "div");
+        d.set_style(panel, "backgroundColor", "rgb(10, 10, 14)");
+        d.set_rect(panel, 0.0, 0.0, 400.0, 80.0);
+        let token = d.add(Some(panel), "span");
+        d.add_text(token, "import");
+        d.set_rect(token, 24.0, 24.0, 50.0, 16.0);
+        d.set_style(token, "color", "rgb(192, 132, 252)");
+        d.set_style(token, "fontFamily", "ui-monospace, SFMono-Regular, monospace");
+        d.set_style(token, "whiteSpace", "pre");
+        d.set_style(token, "display", "inline");
+        // Alone on its line, one colour: a terminal-styled line, still read.
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "a one-colour mono line");
+        // Beside a run in the foreground colour: a highlighted sample.
+        let rest = d.add(Some(panel), "span");
+        d.add_text(rest, " { Agent } ");
+        d.set_style(rest, "color", "rgb(229, 231, 235)");
+        d.set_style(rest, "display", "block");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "a block in another colour");
+        d.set_style(rest, "display", "inline");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_none(), "a code token");
+        // The other run paints nothing: still one visible colour, still read.
+        d.set_style(rest, "visibility", "hidden");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "beside a hidden run");
+        d.set_style(rest, "visibility", "visible");
+        d.set_style(rest, "opacity", "0");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "beside a run at opacity 0");
+        d.set_style(rest, "opacity", "1");
+        d.set_style(rest, "color", "rgba(229, 231, 235, 0)");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "beside a transparent run");
+        d.set_style(rest, "color", "rgb(229, 231, 235)");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_none(), "a code token again");
+        d.set_style(token, "whiteSpace", "pre-line");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "pre-line collapses spaces");
+        d.set_style(token, "whiteSpace", "normal");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "a neon mono line");
+        d.set_style(token, "whiteSpace", "pre");
+        d.set_style(token, "fontFamily", "Inter, sans-serif");
+        assert!(check_element_ai_palette_dom(&d, token, None).ink.is_some(), "kept whitespace alone");
+    }
+
     #[test]
     fn ai_palette_gradient_skips_declared_stops_but_not_undeclared_ones() {
         let (mut d, body) = page();
@@ -8821,6 +8945,51 @@ mod tests {
         assert!(check_element_text_overflow_dom(&d, tag).is_empty(), "an empty icon box");
         d.set_pseudo_style(icon, "::before", "content", "\"Featured this week\"");
         assert_eq!(check_element_text_overflow_dom(&d, tag).len(), 1, "an icon glyph string");
+    }
+
+    /// observations-1006 row 15, hardyn.com.br: an out-of-stock size swatch
+    /// struck through by a rotated `content: "/"` at 50px. The mark is
+    /// placed inside the 35px swatch, so its glyph raising `scrollWidth` to
+    /// 55px is no label running out of the box.
+    #[test]
+    fn text_overflow_measures_a_one_character_mark_placed_inside() {
+        let (mut d, body) = page();
+        let chip = d.add(Some(body), "li");
+        visible(&mut d, chip);
+        d.set_attr(chip, "class", "tamanho_produto");
+        d.add_text(chip, "P");
+        d.set_rect(chip, 181.875, 400.0, 35.0, 35.0);
+        d.el_mut(chip).client_width = 35.0;
+        d.el_mut(chip).client_height = 35.0;
+        d.el_mut(chip).scroll_width = 55.0;
+        d.set_styles(chip, &[("display", "flex"), ("overflow", "visible"), ("overflowX", "visible"), ("position", "relative"), ("fontSize", "20px")]);
+        d.set_text_rect(chip, 193.0, 402.5, 12.7, 29.0);
+        neighbor(&mut d, body, 222.0, 400.0, 35.0, 35.0, "M");
+        for (k, v) in [
+            ("content", "\"/\""),
+            ("position", "absolute"),
+            ("display", "block"),
+            ("width", "19.0938px"),
+            ("height", "20px"),
+            ("top", "-7.6875px"),
+            ("left", "10.5px"),
+            ("transform", "matrix(0.258819, -0.965926, 0.965926, 0.258819, -2.47091, 9.22157)"),
+            ("fontSize", "50px"),
+        ] {
+            d.set_pseudo_style(chip, "::after", k, v);
+        }
+        assert!(check_element_text_overflow_dom(&d, chip).is_empty(), "a mark inside the swatch");
+        // Placed past the swatch's edge, it is not a mark over it.
+        d.set_pseudo_style(chip, "::after", "left", "30px");
+        assert_eq!(check_element_text_overflow_dom(&d, chip).len(), 1, "placed outside");
+        d.set_pseudo_style(chip, "::after", "left", "10.5px");
+        // Two characters are text, not a mark.
+        d.set_pseudo_style(chip, "::after", "content", "\"//\"");
+        assert_eq!(check_element_text_overflow_dom(&d, chip).len(), 1, "two characters");
+        // A size the capture did not resolve to pixels cannot be placed.
+        d.set_pseudo_style(chip, "::after", "content", "\"/\"");
+        d.set_pseudo_style(chip, "::after", "width", "auto");
+        assert_eq!(check_element_text_overflow_dom(&d, chip).len(), 1, "unplaced");
     }
 
     /// observations-25 issue 18 (P19): text that runs past its own box into
