@@ -63,18 +63,19 @@ pub fn run(args: &[String], io: &mut Io, pack: InstalledPack) -> i32 {
             io.out(&format!("impeccable-engine {VERSION}\n"));
             0
         }
+        "motion-capture" => impeccable_browser::motion::run(rest, io),
         "detect" => detect(rest, io, &engines, pack.rule_pack),
         "foundations" => crate::foundations::run(rest, io, &engines, pack.rule_pack),
         "ignores" | "ignore" => impeccable_detect::run_ignores(rest, io),
         // Account sign-in. These never dispatch to the Pro engine.
         "login" => {
             let code = impeccable_account::run_login(rest, io);
-            if code == 0 {
+            // Help exits 0 too; only a finished sign-in earns the follow-ups.
+            let help = rest.iter().any(|a| a == "--help" || a == "-h");
+            if code == 0 && !help {
                 crate::setup_report::schedule(io);
-                // `--help` exits 0 without signing in: nothing to scan for.
-                if !rest.iter().any(|a| a == "--help" || a == "-h") {
-                    scan_after_login(io, &engines, pack.rule_pack);
-                }
+                scan_after_login(io, &engines, pack.rule_pack);
+                crate::loop_install::after_login(io);
             }
             code
         }
@@ -82,6 +83,7 @@ pub fn run(args: &[String], io: &mut Io, pack: InstalledPack) -> i32 {
         "setup-report" => crate::setup_report::run(io),
         "logout" => impeccable_account::run_logout(rest, io),
         "whoami" => impeccable_account::run_whoami(rest, io),
+        "status" => impeccable_account::setup_status::run(rest, io),
         "taste-refresh" => impeccable_account::taste::run_refresh(rest, io),
         "world" => impeccable_account::world::run(rest, io),
         "critiques-refresh" => impeccable_account::critiques::run_refresh(rest, io),
@@ -354,11 +356,13 @@ const KNOWN_VERBS: &[&str] = &[
     "--version",
     "-v",
     "engine-probe",
+    "motion-capture",
     "ignores",
     "ignore",
     "login",
     "logout",
     "whoami",
+    "status",
     "world",
     "health",
     "foundations",
